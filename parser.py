@@ -50,5 +50,11 @@ class TransportNetwork:
 
             origin_id += 1
 
+    def get_access_points_id(self):
+        access_points_id = []
+        for access_point in self.graph:
+            access_points_id.append(access_point.id)
+        return access_points_id
+
 
 mandl = TransportNetwork("MandlTravelTimes.txt")
