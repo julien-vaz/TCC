@@ -2,6 +2,25 @@ import parser
 from random import randint, choice
 
 
+def repair(
+    routeset,
+    touched_access_points,
+    network_size,
+    routeset_size,
+    maximum_length,
+    minimum_length
+    ):
+    attempts = 0
+    while True:
+        chosen_route = choice(routeset)
+        if len(chosen_route) < maximum_length:
+            # TODO: add possible unused access points to either ends
+            pass
+        elif len(touched_access_points) == network_size or (len(touched_access_points) < network_size and attempts == routeset_size):
+            break
+        return repaired_routeset
+
+
 class InitialPopulationGenerator:
     def __init__(self):
         self.routeset_size = int(input("Choose a size for the routesets to be generated: "))
@@ -47,8 +66,22 @@ class InitialPopulationGenerator:
                     next_access_point = choice(unused_access_points)
                     route[count][route_length] = next_access_point
                     selected_access_point = next_access_point
-                    touched_access_points = set(touched_access_points).add(next_access_point)
+                    touched_access_points = list(set(touched_access_points).add(next_access_point))
                 else:
-                    
-                    selected_access_point = routes[]
+                    routes[count].reverse()
+                    selected_access_point = routes[count][route_length - 1]
                     times_reversed += 1
+
+        if len(touched_access_points) < network_size:
+            # call repair(
+            # routeset,
+            # touched_access_points,
+            # network_size,
+            # routeset_size,
+            # maximum_length,
+            # minimum_length
+            # )
+            if repaired_routeset:
+                return repaired_routeset
+            else:
+                return "routeset infeasible"

@@ -3,9 +3,6 @@ class Link:
         self.destination_id = destination_id
         self.travel_time = travel_time
         self.demand = 0
-    
-    def set_demand(self, demand):
-        self.demand = demand
 
 
 class AccessPoint:
