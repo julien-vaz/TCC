@@ -5,6 +5,7 @@ from copy import deepcopy
 
 def add_unused_access_points(terminal, position, unused_access_points):
     terminal_neighborhood = set(terminal.get_neighborhood())
+    # Intersecção, não diferença
     possible_unused_nodes_terminal = list(unused_access_points - terminal_neighborhood)
     if len(possible_unused_nodes_terminal) != 0:
         new_terminal = choice(possible_unused_nodes_terminal)
