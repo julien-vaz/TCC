@@ -20,6 +20,23 @@ class AccessPoint:
         return neighborhood
 
 
+class DemandMatrixParser:
+    def __init__(self, demand_matrix):
+        self.demand_matrix = self.read(demand_matrix)
+
+    def read(self, demand_matrix):
+        demand_matrix = open(demand_matrix, 'r')
+        parsed_demand = []
+
+        for line in demand_matrix:
+            if line == '\n':
+                continue
+            line = line[0:-1]
+            line = line.split()
+            parsed_demand.append(line)
+        return parsed_demand
+
+
 class TransportNetwork:
     def __init__(self, travel_time_matrix):
         self.graph = []
@@ -45,13 +62,10 @@ class TransportNetwork:
             for link in self.graph[origin_id].links:
                 print(f'{link.destination_id} with travel time = {link.travel_time}\n')
 
-            origin_id += 1
+            origin_id += 1 
 
     def get_access_points_id(self):
         access_points_id = []
         for access_point in self.graph:
             access_points_id.append(access_point.id)
         return access_points_id
-
-
-mandl = TransportNetwork("MandlTravelTimes.txt")

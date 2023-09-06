@@ -43,19 +43,25 @@ def repair(
 
 
 class InitialPopulationGenerator:
-    def __init__(self):
+    def __init__(self, transport_network):
         self.routeset_size = int(input("Choose a size for the routesets to be generated: "))
         self.minimum_length = int(input("Choose a minimum length for the routes to be generated: "))
         self.maximum_length = int(input("Choose a maximum length for the routes to be generated: "))
         self.population_size = int(input("Choose the population size: "))
-        self.generate_initial_population()
+        self.population = self.generate_initial_population(self.population_size, transport_network)
 
-    def generate_initial_population(self):
-        #TODO
-        generate_routeset()
+    def generate_initial_population(self, population_size, transport_network):
+        print("Initial population is being generated...")
+        population = set()
+        while len(population) < population_size:
+            routeset = generate_routeset(transport_network)
+            population.add(routeset)
+        print("Initial population has been successfully generated.")
+        return population
+        
 
-    def generate_routeset(self):
-        transport_network = TransportNetwork("MandlTravelTimes.txt")
+    def generate_routeset(self, transport_network):
+        print("Generating routeset...")
         network_size = len(transport_network.graph)
 
         routes = [] 
@@ -94,9 +100,11 @@ class InitialPopulationGenerator:
                     times_reversed += 1
 
         if len(touched_access_points) < network_size:
+            print("Starting repair of routeset...")
             touched_access_points = set(touched_access_points)
             repaired_routeset = repair(routes, all_access_points, touched_access_points, network_size, routeset_size, maximum_length, minimum_length)
             if repaired_routeset:
+                print("Routeset has been successfully repaired. Adding it to the population...")
                 return repaired_routeset
             else:
-                return "routeset infeasible"
+                return "Routeset is infeasible. It will be discarded from the population."
