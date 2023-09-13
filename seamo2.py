@@ -42,15 +42,34 @@ class SEAMO2:
         passenger_cost = numerator / denominator
         return passenger_cost
 
+    def calculate_operator_cost(routeset):
+        operator_cost = 0
+        for route in routeset:
+            for i, j in route:
+                for link in self.transport_network.graph[i].links:
+                    if link[0] == j:
+                        operator_cost += link[1]
+
+
 seamo2 = SEAMO2()
 
 passenger_cost = []
+best_routeset_so_far_passenger_cost = []
 operator_cost = []
+best_routeset_so_far_operator_cost = []
 for routeset in seamo2.initial_population_generator.population:
-    passenger_cost.append(
-        seamo2.calculate_passenger_cost(
+    routeset_passenger_cost = seamo2.calculate_passenger_cost(
             seamo2.initial_population_generator.routeset_size,
             routeset,
             seamo2.demand_matrix
         )
+    passenger_cost.append(routeset_passenger_cost)
+    if routeset_passenger_cost == min(passenger_cost):
+        best_routeset_so_far_passenger_cost = routeset
+
+    routeset_operator_cost = seamo2.calculate_operator_cost(
+        routeset
     )
+    operator_cost.append(routeset_operator_cost)
+    if routeset_operator_cost == min(operator_cost):
+        best_routeset_so_far_operator_cost = routeset
