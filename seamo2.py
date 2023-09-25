@@ -1,6 +1,6 @@
 import initial_population_generator as ipg
 import parser
-from random import choice
+from random import choice, getrandbits, randrange
 from copy import deepcopy
 
 
@@ -48,9 +48,11 @@ class SEAMO2:
         operator_cost = 0
         for route in routeset:
             for i, j in route:
+                # possível melhora do tempo de execução usando hash
                 for link in self.transport_network.graph[i].links:
                     if link[0] == j:
                         operator_cost += link[1]
+        return operator_cost
 
     def crossover(self, parent1, parent2):
         offspring = []
@@ -82,6 +84,72 @@ class SEAMO2:
             first_parent = not first_parent
         return offspring
             
+    def add_access_points(
+        self,
+        routeset,
+        access_points_to_be_changed,
+        absent_access_points,
+        touched_access_points,
+        all_access_points
+        ):
+        aux_routeset = deepcopy(routeset)
+        modified_routeset = []
+        access_points_added = 0
+        while access_points_added < access_points_to_be_changed:
+            chosen_route = choice(aux_routeset)
+            aux_routeset.remove(chosen_route)
+            route_cannot_be_modified_anymore = False
+            while len(touched_access_points) < len(all_access_points):
+                if route_cannot_be_modified_anymore:
+                    break
+                terminal1 = chosen_route[0]
+                access_points_touched_before = deepcopy(touched_access_points)
+                chosen_route, touched_access_points = ipg.add_unused_access_points(
+                    chosen_route,
+                    terminal1,
+                    0,
+                    absent_access_points,
+                    touched_access_points
+                    )
+                if len(touched_access_points) == len(access_points_touched_before) + 1:
+                    access_points_added += 1
+                    route_cannot_be_modified_anymore = False
+                else:
+                    route_cannot_be_modified_anymore = True
+                terminal2 = chosen_route[-1]
+                access_points_touched_before = deepcopy(touched_access_points)
+                chosen_route, touched_access_points = ipg.add_unused_access_points(
+                    chosen_route,
+                    terminal2,
+                    -1,
+                    absent_access_points,
+                    touched_access_points
+                    )
+                if len(touched_access_points) == len(access_points_touched_before) + 1:
+                    access_points_added += 1
+                    route_cannot_be_modified_anymore = False
+                else:
+                    route_cannot_be_modified_anymore = True
+            modified_routeset.append(chosen_route)
+        return modified_routeset
+
+
+    def delete_access_points(self, routeset, access_points_to_be_changed):
+        pass
+
+    def mutation(self, individual, absent_access_points, touched_access_points):
+        access_points_to_be_changed = randrange(
+            1,
+            self.initial_population_generator.routeset_size * (
+                self.initial_population_generator.maximum_length/2
+            )
+        )
+        choice = getrandbits(1)
+        if choice:
+            #call add_nodes(individual, nodes_to_be_changed, absent_access_points, touched_access_points)
+        else:
+            #call delete_nodes(individual, nodes_to_be_changed)
+        pass
 
 
 seamo2 = SEAMO2()
@@ -110,6 +178,21 @@ for routeset in seamo2.initial_population_generator.population:
 generations = int(input("How many generations do you want? "))
 for _ in range(generations):
     for parent1 in seamo2.initial_population_generator.population:
-        parent2 = random.choice(seamo2.initial_population_generator)
+        parent2 = random.choice(seamo2.initial_population_generator.population)
         if parent1 != parent2:
-            offspring = crossover(parent1, parent2)
+            offspring = seamo2.crossover(parent1, parent2)
+            offspring = ipg.repair(offspring)
+            # get used access points on routeset
+            touched_access_points = set()
+            for route in offspring:
+                route = set(route)
+                touched_access_points.union(route)
+            # calculate absent access points from routeset
+            all_access_points = set(seamo2.transport_network.get_access_points_id())
+            absent_access_points = all_access_points - touched_access_points
+            offspring = seamo2.mutation(
+                offspring,
+                absent_access_points,
+                touched_access_points,
+                all_access_points
+                )

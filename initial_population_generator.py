@@ -3,15 +3,21 @@ from random import randint, choice
 from copy import deepcopy
 
 
-def add_unused_access_points(terminal, position, unused_access_points):
+def add_unused_access_points(
+    chosen_route,
+    terminal,
+    position,
+    unused_access_points,
+    touched_access_points
+    ):
     terminal_neighborhood = set(terminal.get_neighborhood())
     # Intersecção, não diferença
-    possible_unused_nodes_terminal = list(unused_access_points - terminal_neighborhood)
+    possible_unused_nodes_terminal = list(unused_access_points.intersection(terminal_neighborhood))
     if len(possible_unused_nodes_terminal) != 0:
         new_terminal = choice(possible_unused_nodes_terminal)
         touched_access_points.add(new_terminal)
         chosen_route.insert(position, new_terminal)
-        return chosen_route, touched_access_points
+    return chosen_route, touched_access_points
 
 
 def repair(
@@ -33,10 +39,22 @@ def repair(
             unused_access_points = all_access_points - touched_access_points
             for _ in range(len(unused_access_points)):
                 terminal1 = chosen_route[0]
-                chosen_route, touched_access_points = add_unused_access_points(terminal1, 0, unused_access_points)
+                chosen_route, touched_access_points = add_unused_access_points(
+                    chosen_route,
+                    terminal1,
+                    0,
+                    unused_access_points,
+                    touched_access_points
+                    )
                 unused_access_points = all_access_points - touched_access_points
                 terminal2 = chosen_route[-1]
-                chosen_route, touched_access_points = add_unused_access_points(terminal2, -1, unused_access_points)
+                chosen_route, touched_access_points = add_unused_access_points(
+                    chosen_route,
+                    terminal2,
+                    -1,
+                    unused_access_points,
+                    touched_access_points
+                    )
         repaired_routeset.append(chosen_route)
     if len(touched_access_points) == network_size:
         return repaired_routeset
@@ -85,7 +103,7 @@ class InitialPopulationGenerator:
             times_reversed = 0
             while(route_length < desired_length and times_reversed <= 1):
                 neighborhood = set(selected_access_point.get_neighborhood())
-                all_access_points = set(transport_network.graph.get_access_points_id())
+                all_access_points = set(transport_network.get_access_points_id())
                 current_route_access_points = set(routes[count])
                 absent_access_points = all_access_points - current_route_access_points
                 unused_access_points = list(neighborhood - absent_access_points)
