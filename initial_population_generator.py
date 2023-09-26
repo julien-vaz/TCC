@@ -121,7 +121,15 @@ class InitialPopulationGenerator:
         if len(touched_access_points) < network_size:
             print("Starting repair of routeset...")
             touched_access_points = set(touched_access_points)
-            repaired_routeset = repair(routes, all_access_points, touched_access_points, network_size, routeset_size, maximum_length, minimum_length)
+            repaired_routeset = repair(
+                routes,
+                all_access_points,
+                touched_access_points,
+                network_size,
+                self.routeset_size,
+                self.maximum_length,
+                self.minimum_length
+                )
             if repaired_routeset:
                 print("Routeset has been successfully repaired. Adding it to the population...")
                 return repaired_routeset

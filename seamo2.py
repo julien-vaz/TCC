@@ -83,6 +83,8 @@ class SEAMO2:
             seed.add(set(next_route))
             first_parent = not first_parent
         return offspring
+
+    
             
     def add_access_points(
         self,
@@ -94,8 +96,8 @@ class SEAMO2:
         ):
         aux_routeset = deepcopy(routeset)
         modified_routeset = []
-        access_points_added = 0
-        while access_points_added < access_points_to_be_changed:
+        added_access_points = 0
+        while added_access_points < access_points_to_be_changed:
             chosen_route = choice(aux_routeset)
             aux_routeset.remove(chosen_route)
             route_cannot_be_modified_anymore = False
@@ -104,38 +106,97 @@ class SEAMO2:
                     break
                 terminal1 = chosen_route[0]
                 access_points_touched_before = deepcopy(touched_access_points)
-                chosen_route, touched_access_points = ipg.add_unused_access_points(
-                    chosen_route,
-                    terminal1,
-                    0,
-                    absent_access_points,
-                    touched_access_points
-                    )
+                if len(chosen_route) < self.initial_population_generator.maximum_length:
+                    chosen_route, touched_access_points = ipg.add_unused_access_points(
+                        chosen_route,
+                        terminal1,
+                        0,
+                        absent_access_points,
+                        touched_access_points
+                        )
                 if len(touched_access_points) == len(access_points_touched_before) + 1:
-                    access_points_added += 1
+                    added_access_points += 1
                     route_cannot_be_modified_anymore = False
                 else:
                     route_cannot_be_modified_anymore = True
                 terminal2 = chosen_route[-1]
                 access_points_touched_before = deepcopy(touched_access_points)
-                chosen_route, touched_access_points = ipg.add_unused_access_points(
-                    chosen_route,
-                    terminal2,
-                    -1,
-                    absent_access_points,
-                    touched_access_points
-                    )
+                if len(chosen_route) < self.initial_population_generator.maximum_length:
+                    chosen_route, touched_access_points = ipg.add_unused_access_points(
+                        chosen_route,
+                        terminal2,
+                        -1,
+                        absent_access_points,
+                        touched_access_points
+                        )
                 if len(touched_access_points) == len(access_points_touched_before) + 1:
-                    access_points_added += 1
+                    added_access_points += 1
                     route_cannot_be_modified_anymore = False
                 else:
                     route_cannot_be_modified_anymore = True
             modified_routeset.append(chosen_route)
         return modified_routeset
 
+    def delete_access_point(
+        self,
+        chosen_route,
+        terminal,
+        position,
+        aux_routeset
+        ):
+        for route in aux_routeset:
+            if terminal in route:
+                chosen_route.remove(terminal)
+                break
+        unfeasible = False
+        chosen_route_access_points = set(chosen_route)
+        for route in aux_routeset:
+            route_access_points = set(route)
+            if chosen_route.isdisjoint(route_access_points):
+                unfeasible = True
+            else:
+                unfeasible = False
+        if unfeasible:
+            chosen_route.insert(terminal, position)
+        return chosen_route, unfeasible
 
     def delete_access_points(self, routeset, access_points_to_be_changed):
-        pass
+        aux_routeset = deepcopy(routeset)
+        modified_routeset = []
+        deleted_access_points = 0
+        while deleted_access_points < access_points_to_be_changed:
+            chosen_route = choice(aux_routeset)
+            chosen_route_index = aux_routeset.index(chosen_route)
+            aux_routeset.remove(chosen_route)
+            aux_routeset2 = deepcopy(aux_routeset)
+            if previous_route is not None:
+                aux_routeset2.insert(previous_route, previous_route_index)
+            route_cannot_be_modified_anymore = False
+            while not route_cannot_be_modified_anymore:
+                terminal1 = chosen_route[0]
+                length_before = len(chosen_route)
+                if len(chosen_route) > self.initial_population_generator.minimum_length:
+                    chosen_route, route_cannot_be_modified_anymore = self.delete_access_point(
+                        chosen_route,
+                        terminal1,
+                        0,
+                        aux_routeset2)
+                if len(chosen_route) < length_before:
+                    deleted_access_points += 1
+                terminal2 = chosen_route[-1]
+                length_before = len(chosen_route)
+                if len(chosen_route) > self.initial_population_generator.minimum_length:
+                    chosen_route, route_cannot_be_modified_anymore = self.delete_access_point(
+                        chosen_route,
+                        terminal2,
+                        -1,
+                        aux_routeset2)
+                if len(chosen_route) < length_before:
+                    deleted_access_points += 1
+            previous_route = chosen_route
+            previous_route_index = chosen_route_index
+            modified_routeset.append(chosen_route)
+        return modified_routeset
 
     def mutation(self, individual, absent_access_points, touched_access_points):
         access_points_to_be_changed = randrange(
@@ -146,10 +207,19 @@ class SEAMO2:
         )
         choice = getrandbits(1)
         if choice:
-            #call add_nodes(individual, nodes_to_be_changed, absent_access_points, touched_access_points)
+            individual = self.add_access_points(
+                individual,
+                access_points_to_be_changed,
+                absent_access_points,
+                touched_access_points,
+                all_access_points,
+                )
         else:
-            #call delete_nodes(individual, nodes_to_be_changed)
-        pass
+            individual = self.delete_access_points(
+                individual,
+                access_points_to_be_changed
+                )
+        return individual
 
 
 seamo2 = SEAMO2()
