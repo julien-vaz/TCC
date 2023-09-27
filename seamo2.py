@@ -221,6 +221,55 @@ class SEAMO2:
                 )
         return individual
 
+    def replace_parents_with_offspring(
+        self,
+        parent,
+        objective1,
+        parent_objective1,
+        objective2,
+        parent_objective2,
+        offspring,
+        offspring_objective1,
+        offspring_objective2
+        ):
+        self.initial_population_generator.population.remove(parent)
+        objective1.remove([parent, parent_objective1])
+        objective2.remove([parent, parent_objective2])
+        self.initial_population_generator.population.add(offspring)
+        objective1.append([offspring, offspring_objective1])
+        objective2.append([offspring, offspring_objective2])
+        
+    def replace_random_parent(
+        self,
+        passenger_cost,
+        operator_cost,
+        parent1,
+        parent2,
+        parent1_passenger_cost,
+        parent1_operator_cost,
+        parent2_passenger_cost,
+        parent2_operator_cost,
+        offspring,
+        offspring_passenger_cost,
+        offspring_operator_cost
+        ):
+        chosen_parent = choice([parent1, parent2])
+        if chosen_parent == parent1:
+            parent_passenger_cost = parent1_passenger_cost
+            parent_operator_cost = parent1_operator_cost
+        elif chosen_parent == parent2:
+            parent_passenger_cost = parent2_passenger_cost
+            parent_operator_cost = parent2_operator_cost
+        seamo2.replace_parents_with_offspring(
+            chosen_parent,
+            passenger_cost,
+            parent_passenger_cost,
+            operator_cost,
+            parent_operator_cost,
+            offspring,
+            offspring_passenger_cost,
+            offspring_operator_cost
+            )
 
 seamo2 = SEAMO2()
 
@@ -234,16 +283,14 @@ for routeset in seamo2.initial_population_generator.population:
             routeset,
             seamo2.demand_matrix
         )
-    passenger_cost.append(routeset_passenger_cost)
+    passenger_cost.append([routeset, routeset_passenger_cost])
     if routeset_passenger_cost == min(passenger_cost):
-        best_routeset_so_far_passenger_cost = routeset
+        best_routeset_so_far_passenger_cost = [routeset, routeset_passenger_cost]
 
-    routeset_operator_cost = seamo2.calculate_operator_cost(
-        routeset
-    )
-    operator_cost.append(routeset_operator_cost)
+    routeset_operator_cost = seamo2.calculate_operator_cost(routeset)
+    operator_cost.append([routeset, routeset_operator_cost])
     if routeset_operator_cost == min(operator_cost):
-        best_routeset_so_far_operator_cost = routeset
+        best_routeset_so_far_operator_cost = [routeset, routeset_operator_cost]
 
 generations = int(input("How many generations do you want? "))
 for _ in range(generations):
@@ -266,3 +313,135 @@ for _ in range(generations):
                 touched_access_points,
                 all_access_points
                 )
+            if offspring in seamo2.initial_population_generator.population:
+                continue
+            offspring_passenger_cost = seamo2.calculate_passenger_cost(
+                seamo2.initial_population_generator.routeset_size,
+                offspring,
+                seamo2.demand_matrix
+                )
+            offspring_operator_cost = seamo2.calculate_operator_cost(offspring)
+            parent1_passenger_cost = seamo2.calculate_passenger_cost(
+                seamo2.initial_population_generator.routeset_size,
+                parent1,
+                seamo2.demand_matrix
+            )
+            parent1_operator_cost = seamo2.calculate_operator_cost(parent1)
+            if offspring_passenger_cost < parent1_passenger_cost and offspring_operator_cost < parent1_operator_cost:
+                seamo2.replace_parents_with_offspring(
+                    parent1,
+                    passenger_cost,
+                    parent1_passenger_cost,
+                    operator_cost,
+                    parent1_operator_cost,
+                    offspring,
+                    offspring_passenger_cost,
+                    offspring_operator_cost
+                    )
+                continue
+            parent2_passenger_cost = seamo2.calculate_passenger_cost(
+                seamo2.initial_population_generator.routeset_size,
+                parent2,
+                seamo2.demand_matrix
+            )
+            parent2_operator_cost = seamo2.calculate_operator_cost(parent2)
+            if offspring_passenger_cost < parent2_passenger_cost and offspring_operator_cost < parent2_operator_cost:
+                seamo2.replace_parents_with_offspring(
+                    parent2,
+                    passenger_cost,
+                    parent2_passenger_cost,
+                    operator_cost,
+                    parent2_operator_cost,
+                    offspring,
+                    offspring_passenger_cost,
+                    offspring_operator_cost
+                    )
+                continue
+            if (offspring_passenger_cost < best_routeset_so_far_passenger_cost[1]
+                and
+                offspring_operator_cost < calculate_operator_cost(best_routeset_so_far_passenger_cost[0])):
+                best_routeset_so_far_passenger_cost = [offspring, offspring_passenger_cost]
+                seamo2.replace_random_parent(
+                    passenger_cost,
+                    operator_cost,
+                    parent1,
+                    parent2,
+                    parent1_passenger_cost,
+                    parent1_operator_cost,
+                    parent2_passenger_cost,
+                    parent2_operator_cost,
+                    offspring,
+                    offspring_passenger_cost,
+                    offspring_operator_cost
+                    )                    
+                continue
+            if (offspring_operator_cost < best_routeset_so_far_operator_cost[1]
+                and
+                offspring_passenger_cost < calculate_passenger_cost(best_routeset_so_far_operator_cost[0])):
+                best_routeset_so_far_operator_cost = [offspring, offspring_operator_cost]
+                seamo2.replace_random_parent(
+                    passenger_cost,
+                    operator_cost,
+                    parent1,
+                    parent2,
+                    parent1_passenger_cost,
+                    parent1_operator_cost,
+                    parent2_passenger_cost,
+                    parent2_operator_cost,
+                    offspring,
+                    offspring_passenger_cost,
+                    offspring_operator_cost
+                    )
+                continue
+            if offspring_passenger_cost < best_routeset_so_far_passenger_cost[1]:
+                best_routeset_so_far_passenger_cost = [offspring, offspring_passenger_cost]
+                seamo2.replace_random_parent(
+                    passenger_cost,
+                    operator_cost,
+                    parent1,
+                    parent2,
+                    parent1_passenger_cost,
+                    parent1_operator_cost,
+                    parent2_passenger_cost,
+                    parent2_operator_cost,
+                    offspring,
+                    offspring_passenger_cost,
+                    offspring_operator_cost
+                    )
+                continue
+            if offspring_operator_cost < best_routeset_so_far_operator_cost[1]:
+                best_routeset_so_far_operator_cost = [offspring, offspring_operator_cost]
+                seamo2.replace_random_parent(
+                    passenger_cost,
+                    operator_cost,
+                    parent1,
+                    parent2,
+                    parent1_passenger_cost,
+                    parent1_operator_cost,
+                    parent2_passenger_cost,
+                    parent2_operator_cost,
+                    offspring,
+                    offspring_passenger_cost,
+                    offspring_operator_cost
+                    )
+                continue        
+            if (offspring_passenger_cost == parent1_passenger_cost == parent2_passenger_cost
+                and
+                offspring_operator_cost == parent1_operator_cost == parent2_operator_cost):
+                for routeset in seamo2.initial_population_generator.population:
+                    routeset_passenger_cost = passenger_cost[routeset]
+                    routeset_operator_cost = operator_cost[routeset]
+                    if (offspring_passenger_cost < routeset_passenger_cost
+                        and
+                        offspring_operator_cost < routeset_operator_cost):
+                        seamo2.initial_population_generator.population.remove(routeset)
+                        seamo2.initial_population_generator.population.add(offspring)
+                        passenger_cost.remove([routeset, routeset_passenger_cost])
+                        passenger_cost.append([offspring, offspring_passenger_cost])
+                        operator_cost.remove([routeset, routeset_operator_cost])
+                        operator_cost.append([offspring, offspring_operator_cost])
+                        continue
+            else:
+                continue
+for individual in seamo2.initial_population_generator.population:
+    print(f'{individual}\n')
