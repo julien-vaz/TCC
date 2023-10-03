@@ -8,7 +8,7 @@ class SEAMO2:
     def __init__(self):
         self.transport_network = parser.TransportNetwork("MandlTravelTimes.txt")
         self.demand_matrix = parser.DemandMatrixParser("MandlDemand.txt")
-        self.initial_population_generator = ipg.InitialPopulationGenerator(transport_network)
+        self.initial_population_generator = ipg.InitialPopulationGenerator(self.transport_network)
 
     def get_shortest_path_travel_time(self, routeset, origin_id, destination_id):
         shortest_path_travel_time = "Infinite"
@@ -272,7 +272,7 @@ class SEAMO2:
             )
 
 seamo2 = SEAMO2()
-
+'''
 passenger_cost = []
 best_routeset_so_far_passenger_cost = []
 operator_cost = []
@@ -443,5 +443,20 @@ for _ in range(generations):
                         continue
             else:
                 continue
-for individual in seamo2.initial_population_generator.population:
-    print(f'{individual}\n')
+'''
+for i, routeset in enumerate(seamo2.initial_population_generator.population):
+    print(f'Routeset {i}:\n')
+    for j, route in enumerate(routeset):
+        '''if route == routeset[-1]:
+            print(f'Route {j}:')
+        else:'''    
+        print(f'Route {j}: [', end='')
+        for access_point_id in route:
+            if len(route) == 1:
+                print(f'[{access_point_id}]')
+            else:
+                if access_point_id == route[-1]:
+                    print(f'{access_point_id}]')
+                else:
+                    print(f'{access_point_id} -', end=' ')
+    print()

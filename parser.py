@@ -1,6 +1,12 @@
+def get_access_points_id(list):
+        access_points_id = []
+        for access_point in list:
+            access_points_id.append(access_point.id)
+        return access_points_id
+
 class Link:
-    def __init__(self, destination_id, travel_time):
-        self.destination_id = destination_id
+    def __init__(self, destination, travel_time):
+        self.destination = destination
         self.travel_time = travel_time
         self.demand = 0
 
@@ -16,7 +22,7 @@ class AccessPoint:
     def get_neighborhood(self):
         neighborhood = []
         for neighbor in self.links:
-            neighborhood.append(neighbor.destination_id)
+            neighborhood.append(neighbor.destination)
         return neighborhood
 
 
@@ -56,16 +62,17 @@ class TransportNetwork:
             for (destination_id, travel_time) in enumerate(aux):
                 if travel_time == '0' or travel_time == 'Inf':
                     continue
-                self.graph[origin_id].add_link(Link(destination_id, travel_time))
+                self.graph[origin_id].add_link(Link(AccessPoint(destination_id), travel_time))
 
+            '''
             print(f'Links from {self.graph[origin_id].id} to:\n')
             for link in self.graph[origin_id].links:
-                print(f'{link.destination_id} with travel time = {link.travel_time}\n')
+                print(f'{link.destination} with travel time = {link.travel_time}\n')
+            '''
+            origin_id += 1
 
-            origin_id += 1 
-
-    def get_access_points_id(self):
-        access_points_id = []
+    def get_by_id(self, access_point_id):
         for access_point in self.graph:
-            access_points_id.append(access_point.id)
-        return access_points_id
+            if access_point.id == access_point_id:
+                return access_point 
+    
