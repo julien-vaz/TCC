@@ -10,7 +10,9 @@ def add_unused_access_points(
     unused_access_points,
     touched_access_points
     ):
-    terminal_neighborhood = set(terminal.get_neighborhood())
+    if position == -1:
+        position = len(chosen_route)
+    terminal_neighborhood = set(parser.get_access_points_id(terminal.get_neighborhood()))
     # Intersecção, não diferença
     possible_unused_nodes_terminal = list(unused_access_points.intersection(terminal_neighborhood))
     if len(possible_unused_nodes_terminal) != 0:
@@ -32,15 +34,45 @@ def repair(
     ):
     aux_routeset = deepcopy(routeset)
     repaired_routeset = []
-    while len(touched_access_points) < network_size and aux_routeset != []:
+    while aux_routeset != []:
         chosen_route = choice(aux_routeset)
         aux_routeset.remove(chosen_route)
         if len(chosen_route) < maximum_length:
             # add possible unused access points to either ends
             unused_access_points = all_access_points - touched_access_points
-            for _ in range(len(unused_access_points)):
+            
+            # MAYBE TOO MANY ITERATIONS
+            for _ in range(2 * network_size):
+                if (
+                    len(unused_access_points) == 0
+                    or
+                    len(chosen_route) == maximum_length
+                    ):
+                    break
                 terminal1_id = chosen_route[0]
                 terminal1 = transport_network.get_by_id(terminal1_id)
+                terminal1_neighborhood = set(
+                    parser.get_access_points_id(
+                        terminal1.get_neighborhood()
+                    )
+                )
+                terminal2_id = chosen_route[-1]
+                terminal2 = transport_network.get_by_id(terminal2_id)
+                terminal2_neighborhood = set(
+                    parser.get_access_points_id(
+                        terminal2.get_neighborhood()
+                    )
+                )
+                if (len(unused_access_points.intersection(
+                        terminal1_neighborhood
+                        )) == 0
+                    and
+                    len(unused_access_points.intersection(
+                        terminal2_neighborhood
+                        )) == 0
+                    ):
+                    break 
+                
                 chosen_route, touched_access_points = add_unused_access_points(
                     chosen_route,
                     terminal1,
@@ -49,8 +81,7 @@ def repair(
                     touched_access_points
                     )
                 unused_access_points = all_access_points - touched_access_points
-                terminal2_id = chosen_route[-1]
-                terminal2 = transport_network.get_by_id(terminal2_id)
+                
                 chosen_route, touched_access_points = add_unused_access_points(
                     chosen_route,
                     terminal2,
@@ -58,6 +89,7 @@ def repair(
                     unused_access_points,
                     touched_access_points
                     )
+                unused_access_points = all_access_points - touched_access_points
         repaired_routeset.append(chosen_route)
     if len(touched_access_points) == network_size:
         return repaired_routeset
@@ -154,10 +186,10 @@ class InitialPopulationGenerator:
                 regrow_route = False
                 count += 1
         print("Routeset has been generated")
+        print()
         
         if len(touched_access_points) < network_size:
             print("Starting repair of routeset...")
-            touched_access_points = set(touched_access_points)
             repaired_routeset = repair(
                 routes,
                 all_access_points_ids,

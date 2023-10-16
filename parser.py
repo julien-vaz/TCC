@@ -35,11 +35,17 @@ class DemandMatrixParser:
         parsed_demand = []
 
         for line in demand_matrix:
-            if line == '\n':
+            line = line.lstrip()
+            line = line.rstrip()
+            if line == '':
                 continue
             line = line[0:-1]
             line = line.split()
-            parsed_demand.append(line)
+            int_line = []
+            for value in line:
+                value = int(value)
+                int_line.append(value)
+            parsed_demand.append(int_line)
         return parsed_demand
 
 
@@ -47,6 +53,15 @@ class TransportNetwork:
     def __init__(self, travel_time_matrix):
         self.graph = []
         self.read(travel_time_matrix)
+
+
+    def get_worst_path_travel_time(self):
+        highest_travel_time = 0
+        for access_point in self.graph:
+            for link in access_point.links:
+                if highest_travel_time < link.travel_time:
+                    highest_travel_time = link.travel_time
+        return highest_travel_time * len(self.graph)
 
     def read(self, travel_time_matrix):
         travel_time_matrix = open(travel_time_matrix, 'r')
@@ -62,7 +77,7 @@ class TransportNetwork:
             for (destination_id, travel_time) in enumerate(aux):
                 if travel_time == '0' or travel_time == 'Inf':
                     continue
-                self.graph[origin_id].add_link(Link(AccessPoint(destination_id), travel_time))
+                self.graph[origin_id].add_link(Link(AccessPoint(destination_id), int(travel_time)))
 
             '''
             print(f'Links from {self.graph[origin_id].id} to:\n')
@@ -70,6 +85,8 @@ class TransportNetwork:
                 print(f'{link.destination} with travel time = {link.travel_time}\n')
             '''
             origin_id += 1
+
+        self.worst_path_travel_time = self.get_worst_path_travel_time()
 
     def get_by_id(self, access_point_id):
         for access_point in self.graph:

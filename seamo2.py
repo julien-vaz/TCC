@@ -11,47 +11,53 @@ class SEAMO2:
         self.initial_population_generator = ipg.InitialPopulationGenerator(self.transport_network)
 
     def get_shortest_path_travel_time(self, routeset, origin_id, destination_id):
-        shortest_path_travel_time = "Infinite"
+        shortest_path_travel_time = self.transport_network.worst_path_travel_time
         for route in routeset:
             if origin_id in route and destination_id in route:
-                shortest_path_travel_time = 0
+                # MUST INITIALIZE WITH LARGEST INTEGER POSSIBLE
                 origin_id_index = route.index(origin_id)
                 destination_id_index = route.index(destination_id)
-                path = route[origin_id_index:destination_id_index + 1]
+                if origin_id_index < destination_id_index:
+                    path = route[origin_id_index:destination_id_index + 1]
+                elif origin_id_index > destination_id_index:
+                    path = route[destination_id_index:origin_id_index + 1]
+                else:
+                    return 0
                 path_links = list(zip(path, path[1:]))
                 path_travel_time = 0
                 for path_link in path_links:
                     origin_access_point = self.transport_network.graph[path_link[0]]
                     destination_access_point = path_link[1]
                     for access_point_link in origin_access_point.links:
-                        if access_point_link[0] == destination_access_point:
-                            path_travel_time += access_point_link[1]
+                        if access_point_link.destination.id == destination_access_point:
+                            path_travel_time += access_point_link.travel_time
                 if path_travel_time < shortest_path_travel_time:
                     shortest_path_travel_time = path_travel_time
         return shortest_path_travel_time
 
     def calculate_passenger_cost(self, routeset_size, routeset, demand_matrix):
         numerator = 0
-        for i in range(len(routeset_size)):
-            for j in range(len(routeset_size)):
+        for i in range(routeset_size):
+            for j in range(routeset_size):
                 shortest_path_travel_time_from_i_to_j = self.get_shortest_path_travel_time(routeset, i, j)
-                partial_numerator = demand_matrix[i][j] * shortest_path_travel_time_from_i_to_j
+                partial_numerator = demand_matrix.demand_matrix[i][j] * shortest_path_travel_time_from_i_to_j
                 numerator += partial_numerator
         denominator = 0
-        for i in range(len(routeset_size)):
-            for j in range(len(routeset_size)):
-                denominator += demand_matrix[i][j]
+        for i in range(routeset_size):
+            for j in range(routeset_size):
+                denominator += demand_matrix.demand_matrix[i][j]
         passenger_cost = numerator / denominator
         return passenger_cost
 
     def calculate_operator_cost(self, routeset):
         operator_cost = 0
         for route in routeset:
-            for i, j in route:
+            route_links = list(zip(route, route[1:]))
+            for (i, j) in route_links:
                 # possível melhora do tempo de execução usando hash
                 for link in self.transport_network.graph[i].links:
-                    if link[0] == j:
-                        operator_cost += link[1]
+                    if link.destination.id == j:
+                        operator_cost += link.travel_time
         return operator_cost
 
     def crossover(self, parent1, parent2):
@@ -272,26 +278,42 @@ class SEAMO2:
             )
 
 seamo2 = SEAMO2()
-'''
+
 passenger_cost = []
 best_routeset_so_far_passenger_cost = []
 operator_cost = []
 best_routeset_so_far_operator_cost = []
-for routeset in seamo2.initial_population_generator.population:
+for (routeset_id, routeset) in enumerate(seamo2.initial_population_generator.population):
     routeset_passenger_cost = seamo2.calculate_passenger_cost(
             seamo2.initial_population_generator.routeset_size,
             routeset,
             seamo2.demand_matrix
         )
-    passenger_cost.append([routeset, routeset_passenger_cost])
-    if routeset_passenger_cost == min(passenger_cost):
-        best_routeset_so_far_passenger_cost = [routeset, routeset_passenger_cost]
-
+    passenger_cost.append([routeset_id, routeset, routeset_passenger_cost])
+    
     routeset_operator_cost = seamo2.calculate_operator_cost(routeset)
-    operator_cost.append([routeset, routeset_operator_cost])
+    operator_cost.append([routeset_id, routeset, routeset_operator_cost])
     if routeset_operator_cost == min(operator_cost):
-        best_routeset_so_far_operator_cost = [routeset, routeset_operator_cost]
+        best_routeset_so_far_operator_cost = [routeset_id, routeset, routeset_operator_cost]
 
+lowest_passenger_cost = passenger_cost[0][2]
+for routeset in passenger_cost:
+    if routeset[2] < lowest_passenger_cost:
+        lowest_passenger_cost = routeset[2]
+for routeset in passenger_cost:
+    if routeset[2] == lowest_passenger_cost:
+        best_routeset_so_far_passenger_cost = routeset
+
+lowest_operator_cost = operator_cost[0][2]
+for routeset in operator_cost:
+    if routeset[2] < lowest_operator_cost:
+        lowest_operator_cost = routeset[2]
+for routeset in operator_cost:
+    if routeset[2] == lowest_operator_cost:
+        best_routeset_so_far_operator_cost = routeset
+
+
+'''
 generations = int(input("How many generations do you want? "))
 for _ in range(generations):
     for parent1 in seamo2.initial_population_generator.population:
@@ -460,3 +482,8 @@ for i, routeset in enumerate(seamo2.initial_population_generator.population):
                 else:
                     print(f'{access_point_id} -', end=' ')
     print()
+    print("Passenger cost: {:.2f}\n".format(passenger_cost[i][2]))
+    print("Operator cost: {:.2f}\n".format(operator_cost[i][2]))
+    
+print(f"Best routeset for passenger cost: Routeset {best_routeset_so_far_passenger_cost[0]}\n")
+print(f"Best routeset for operator cost: Routeset {best_routeset_so_far_operator_cost[0]}\n")
