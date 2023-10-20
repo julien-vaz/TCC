@@ -151,6 +151,7 @@ class InitialPopulationGenerator:
                 touched_access_points.add(selected_access_point_id)
             route_length = len(routes[count])
 
+            touched_access_points_before = deepcopy(touched_access_points)
             times_reversed = 0
             while(route_length < desired_length and times_reversed <= 1):
                 selected_access_point = self.transport_network.get_by_id(
@@ -176,11 +177,14 @@ class InitialPopulationGenerator:
                     routes[count].reverse()
                     selected_access_point_id = routes[count][route_length - 1]
                     times_reversed += 1
+            
             if route_length != desired_length:
                 print(f"Desired length was not achieved. Trying to grow route {count} again.")
                 regrow_route = True
                 regrow_route_from = routes[count][0]
                 routes[count].clear()
+                touched_access_points = touched_access_points_before
+
             else:
                 print(f"Route {count} has been successfully generated.")
                 regrow_route = False

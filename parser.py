@@ -91,5 +91,13 @@ class TransportNetwork:
     def get_by_id(self, access_point_id):
         for access_point in self.graph:
             if access_point.id == access_point_id:
-                return access_point 
+                return access_point
+
+    def build_adjacencies_list(self):
+        adjacencies_list = {}
+        for access_point in self.graph:
+            if access_point.id not in adjacencies_list:
+                access_point_adjacencies = get_access_points_id(access_point.get_neighborhood())
+                adjacencies_list[access_point.id] = access_point_adjacencies
+        return adjacencies_list
     

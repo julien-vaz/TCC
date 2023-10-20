@@ -2,6 +2,8 @@ import initial_population_generator as ipg
 import parser
 from random import choice, getrandbits, randrange
 from copy import deepcopy
+import networkx as nx
+import matplotlib.pyplot as plt
 
 
 class SEAMO2:
@@ -60,11 +62,12 @@ class SEAMO2:
                         operator_cost += link.travel_time
         return operator_cost
 
+    # TODO: NEED TO FIND AND FIX BUG
     def crossover(self, parent1, parent2):
         offspring = []
         parent1_copy = deepcopy(parent1)
         parent2_copy = deepcopy(parent2)
-        seed = set(choice(parent1_copy))
+        seed = choice(parent1_copy)
         parent1_copy.remove(seed)
         offspring.append(seed)
         first_parent = True
@@ -75,18 +78,19 @@ class SEAMO2:
                 chosen_parent = parent1_copy
             potential_routes = []
             for route in chosen_parent:
+                seed = set(seed)
                 if not seed.isdisjoint(set(route)):
                     potential_routes.append(route)
             next_route = []
             smallest_intersection = len(self.transport_network.graph)
             for route in potential_routes:
                 intersection = seed.intersection(set(route))
-                if intersection < smallest_intersection:
-                    smallest_intersection = intersection
+                if len(intersection) < smallest_intersection:
+                    smallest_intersection = len(intersection)
                     next_route = route
                     chosen_parent.remove(next_route)
                     offspring.append(next_route)
-            seed.add(set(next_route))
+            seed = seed.union(set(next_route))
             first_parent = not first_parent
         return offspring
 
@@ -279,6 +283,30 @@ class SEAMO2:
 
 seamo2 = SEAMO2()
 
+adjacencies_list = seamo2.transport_network.build_adjacencies_list()
+
+graph = nx.Graph(adjacencies_list)
+pos = {
+    0:(1, 9),
+    1:(3, 8),
+    2:(4.5, 7.75),
+    3:(2.75, 6.2),
+    4:(0.8, 6.6),
+    5:(4.6, 6),
+    6:(7, 4.5),
+    7:(5.5, 5),
+    8:(8.5, 6.8),
+    9:(5.8, 3.25),
+    10:(3.8, 2.25),
+    11:(1.3, 3.5),
+    12:(5.25, 1),
+    13:(6.7, 1.75),
+    14:(6.75, 5.8)
+}
+nx.draw_networkx(graph, pos, with_labels=True)
+plt.show()
+
+
 passenger_cost = []
 best_routeset_so_far_passenger_cost = []
 operator_cost = []
@@ -293,8 +321,6 @@ for (routeset_id, routeset) in enumerate(seamo2.initial_population_generator.pop
     
     routeset_operator_cost = seamo2.calculate_operator_cost(routeset)
     operator_cost.append([routeset_id, routeset, routeset_operator_cost])
-    if routeset_operator_cost == min(operator_cost):
-        best_routeset_so_far_operator_cost = [routeset_id, routeset, routeset_operator_cost]
 
 lowest_passenger_cost = passenger_cost[0][2]
 for routeset in passenger_cost:
@@ -312,22 +338,35 @@ for routeset in operator_cost:
     if routeset[2] == lowest_operator_cost:
         best_routeset_so_far_operator_cost = routeset
 
-
 '''
 generations = int(input("How many generations do you want? "))
 for _ in range(generations):
     for parent1 in seamo2.initial_population_generator.population:
-        parent2 = random.choice(seamo2.initial_population_generator.population)
+        parent2 = choice(seamo2.initial_population_generator.population)
         if parent1 != parent2:
             offspring = seamo2.crossover(parent1, parent2)
-            offspring = ipg.repair(offspring)
+            all_access_points = parser.get_access_points_id(seamo2.transport_network.graph)
             # get used access points on routeset
             touched_access_points = set()
             for route in offspring:
-                route = set(route)
-                touched_access_points.union(route)
+                touched_access_points.union(set(route))
+            if len(touched_access_points) < len(seamo2.transport_network.graph): 
+                offspring = ipg.repair(
+                    offspring,
+                    all_access_points,
+                    touched_access_points,
+                    len(seamo2.transport_network.graph),
+                    seamo2.initial_population_generator.routeset_size,
+                    seamo2.initial_population_generator.maximum_length,
+                    seamo2.initial_population_generator.minimum_length,
+                    seamo2.transport_network
+                    )
+                if offspring == False:
+                    continue
+            # update used access points on routeset
+            for route in offspring:
+                touched_access_points.union(set(route))
             # calculate absent access points from routeset
-            all_access_points = set(seamo2.transport_network.get_access_points_id())
             absent_access_points = all_access_points - touched_access_points
             offspring = seamo2.mutation(
                 offspring,
@@ -468,12 +507,16 @@ for _ in range(generations):
 '''
 for i, routeset in enumerate(seamo2.initial_population_generator.population):
     print(f'Routeset {i}:\n')
+    nodes = parser.get_access_points_id(seamo2.transport_network.graph)
+    colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple']
+    figure = 2 
     for j, route in enumerate(routeset):
-        '''if route == routeset[-1]:
-            print(f'Route {j}:')
-        else:'''    
         print(f'Route {j}: [', end='')
+        route_nodes = []
+        route_nodes_positions = {}
         for access_point_id in route:
+            route_nodes.append(access_point_id)
+            route_nodes_positions[access_point_id] = pos[access_point_id]
             if len(route) == 1:
                 print(f'[{access_point_id}]')
             else:
@@ -481,7 +524,17 @@ for i, routeset in enumerate(seamo2.initial_population_generator.population):
                     print(f'{access_point_id}]')
                 else:
                     print(f'{access_point_id} -', end=' ')
+        route_edges = list(zip(route_nodes, route_nodes[1:]))
+        color = choice(colors)
+        colors.remove(color)
+        plt.figure(figure)
+        nx.draw_networkx(graph, pos, with_labels=True)
+        nx.draw_networkx_nodes(graph, route_nodes_positions, route_nodes, node_color=color)
+        nx.draw_networkx_edges(graph, route_nodes_positions, route_edges, edge_color=color, width=2)        
+        figure += 1
+    plt.show()                
     print()
+
     print("Passenger cost: {:.2f}\n".format(passenger_cost[i][2]))
     print("Operator cost: {:.2f}\n".format(operator_cost[i][2]))
     
