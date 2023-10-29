@@ -12,11 +12,225 @@ class SEAMO2:
         self.demand_matrix = parser.DemandMatrixParser("MandlDemand.txt")
         self.initial_population_generator = ipg.InitialPopulationGenerator(self.transport_network)
 
+    def get_transfer_points(self, routeset):
+        touched_points_n_times = {}
+        transfer_points = set()
+        for route in routeset:
+            for access_point_id in route:
+                if access_point_id not in touched_points_n_times.keys():
+                    touched_points_n_times[access_point_id] = 1
+                else:
+                    touched_points_n_times[access_point_id] += 1
+        for access_point_id in touched_points_n_times.keys():
+            if touched_points_n_times[access_point_id] > 1:
+                transfer_points.add(access_point_id)
+        return transfer_points
+
+
+    def compute_path_travel_time(self, path):
+        path_links = list(zip(path, path[1:]))
+        path_travel_time = 0
+        for path_link in path_links:
+            origin_access_point = self.transport_network.graph[path_link[0]]
+            destination_access_point = path_link[1]
+            for access_point_link in origin_access_point.links:
+                if access_point_link.destination.id == destination_access_point:
+                    path_travel_time += access_point_link.travel_time
+        return path_travel_time
+
+    def find_second_path(
+        self,
+        routes_with_destination_aux,
+        destination_id,
+        chosen_transfer_point,
+        chosen_second_route
+        ):
+        chosen_transfer_point_index_second_route = chosen_second_route.index(
+            chosen_transfer_point
+        )
+        destination_id_index_second_route = chosen_second_route.index(
+            destination_id
+        )
+        if destination_id_index_second_route > chosen_transfer_point_index_second_route:
+            second_path = chosen_second_route[
+                chosen_transfer_point_index_second_route:destination_id_index_second_route + 1
+                ]
+        elif destination_id_index_second_route < chosen_transfer_point_index_second_route:
+            second_path = chosen_second_route[
+                destination_id_index_second_route:chosen_transfer_point_index_second_route + 1
+                ]
+            second_path.reverse()
+        return second_path, routes_with_destination_aux
+
+    def get_one_transfer_path_travel_time(
+        self,
+        origin_destination_transfer_points_aux,
+        route,
+        destination_id,
+        origin_id_index,
+        routes_with_destination,
+        routes_with_destination_aux,
+        shortest_path_travel_time
+        ):
+        if route in routes_with_destination_aux:
+            routes_with_destination_aux.remove(route)
+        origin_destination_transfer_points_aux = list(origin_destination_transfer_points_aux)
+        while len(origin_destination_transfer_points_aux) != 0:
+            chosen_transfer_point = choice(origin_destination_transfer_points_aux)
+            origin_destination_transfer_points_aux.remove(chosen_transfer_point)
+            if chosen_transfer_point not in route:
+                continue
+            chosen_transfer_point_index = route.index(chosen_transfer_point)
+            if origin_id_index < chosen_transfer_point_index:
+                while len(routes_with_destination_aux) != 0:
+                    chosen_second_route = choice(routes_with_destination_aux)
+                    routes_with_destination_aux.remove(chosen_second_route)
+                    if chosen_transfer_point not in chosen_second_route:
+                        continue
+                    path = route[origin_id_index:chosen_transfer_point_index + 1]
+                    second_path, routes_with_destination_aux = self.find_second_path(
+                        routes_with_destination_aux,
+                        destination_id,
+                        chosen_transfer_point,
+                        chosen_second_route
+                    )
+                    path = path + second_path[1:]
+                    path_travel_time = self.compute_path_travel_time(path) + 5
+                    if path_travel_time < shortest_path_travel_time:
+                        shortest_path_travel_time = path_travel_time
+                routes_with_destination_aux = routes_with_destination                            
+            elif origin_id_index > chosen_transfer_point_index:
+                while len(routes_with_destination_aux) != 0:
+                    chosen_second_route = choice(routes_with_destination_aux)
+                    routes_with_destination_aux.remove(chosen_second_route)
+                    if chosen_transfer_point not in chosen_second_route:
+                        continue
+                    path = route[chosen_transfer_point_index:origin_id_index + 1]
+                    path.reverse()
+                    second_path, routes_with_destination_aux = self.find_second_path(
+                        routes_with_destination_aux,
+                        destination_id,
+                        chosen_transfer_point,
+                        chosen_second_route
+                    )
+                    path = path + second_path[1:]
+                    path_travel_time = self.compute_path_travel_time(path) + 5
+                    if path_travel_time < shortest_path_travel_time:
+                        shortest_path_travel_time = path_travel_time
+                routes_with_destination_aux = routes_with_destination
+            
+        return shortest_path_travel_time
+
+    def get_two_transfers_path_travel_time(
+        self,
+        origin_id,
+        route,
+        routeset,
+        transfer_points_from_origin,
+        transfer_points_to_destination,
+        routes_with_destination
+        ):
+        routes_with_destination_aux = deepcopy(routes_with_destination)
+        if origin_id in route:
+            origin_id_index = route.index(origin_id)
+            transfer_points_from_origin_aux = transfer_points_from_origin
+            while len(transfer_points_from_origin_aux) != 0:
+                chosen_transfer_point_from_origin = choice(transfer_points_from_origin_aux)
+                transfer_points_from_origin_aux.remove(chosen_transfer_point_from_origin)
+                if chosen_transfer_point_from_origin not in route:
+                    continue
+                chosen_transfer_point_from_origin_index = route.index(chosen_transfer_point_from_origin)
+                if origin_id_index < chosen_transfer_point_from_origin_index:
+                    first_path = route[origin_id_index:chosen_transfer_point_from_origin_index + 1]
+                elif origin_id_index > chosen_transfer_point_from_origin_index:
+                    first_path = route[chosen_transfer_point_from_origin_index:origin_id_index + 1]
+                    first_path.reverse()
+                transfer_points_to_destination_aux = transfer_points_to_destination
+                while len(transfer_points_to_destination_aux) != 0:
+                    chosen_transfer_point_to_destination = choice(transfer_points_to_destination_aux)
+                    transfer_points_to_destination_aux.remove(chosen_transfer_point_to_destination)
+                    routes_with_destination_aux.remove(route)
+                    for second_route in routes_with_destination_aux:
+                        if chosen_transfer_point_to_destination not in second_route:
+                            continue
+                        chosen_transfer_point_to_destination_index = second_route.index(chosen_transfer_point_to_destination)
+                        destination_id_index = second_route.index(destination_id)
+                        if destination_id_index > chosen_transfer_point_to_destination_index:
+                            second_path = second_route[chosen_transfer_point_to_destination_index:destination_id_index + 1]
+                        elif destination_id_index < chosen_transfer_point_to_destination_index:
+                            second_path = second_route[destination_id_index: chosen_transfer_point_to_destination_index + 1]
+                            second_path.reverse()
+                        routeset_aux = deepcopy(routeset)
+                        routeset_aux.remove(route)
+                        routeset_aux.remove(second_route)
+                        for third_route in routeset_aux:
+                            if (
+                                chosen_transfer_point_from_origin not in third_route
+                                or
+                                chosen_transfer_point_to_destination not in third_route
+                            ):
+                                continue
+                            chosen_transfer_point_from_origin_index_third_route = third_route.index(
+                                chosen_transfer_point_from_origin
+                            )
+                            chosen_transfer_point_to_destination_index_third_route = third_route.index(
+                                chosen_transfer_point_to_destination
+                            )
+                            if (
+                                chosen_transfer_point_from_origin_index_third_route
+                                <
+                                chosen_transfer_point_to_destination_index_third_route
+                            ):
+                                third_path = third_route[
+                                    chosen_transfer_point_from_origin_index_third_route
+                                    :
+                                    chosen_transfer_point_to_destination_index_third_route
+                                    ]
+                            elif (
+                                chosen_transfer_point_from_origin_index_third_route
+                                >
+                                chosen_transfer_point_to_destination_index_third_route
+                            ):
+                                third_path = third_route[
+                                    chosen_transfer_point_to_destination_index_third_route
+                                    :
+                                    chosen_transfer_point_from_origin_index_third_route
+                                ]
+                                third_path.reverse()
+                            path = first_path + third_path[1:] + second_path[1:]
+                            path_travel_time = self.compute_path_travel_time(path)
+                            if path_travel_time < shortest_path_travel_time:
+                                shortest_path_travel_time = path_travel_time
+        return shortest_path_travel_time                                            
+
     def get_shortest_path_travel_time(self, routeset, origin_id, destination_id):
         shortest_path_travel_time = self.transport_network.worst_path_travel_time
+        routeset_transfer_points = self.get_transfer_points(routeset)
+        transfer_points_from_origin = set()
+        transfer_points_to_destination = set()
+        routes_with_origin = []
+        routes_with_destination = []
         for route in routeset:
+            route_aux = set(route)
+            if origin_id in route:
+                routes_with_origin.append(route)
+                transfer_points_in_route_from_origin = route_aux.intersection(routeset_transfer_points)
+                transfer_points_from_origin = transfer_points_from_origin.union(
+                    transfer_points_in_route_from_origin
+                )
+            if destination_id in route:
+                routes_with_destination.append(route)
+                transfer_points_in_route_to_destination = route_aux.intersection(routeset_transfer_points)
+                transfer_points_to_destination = transfer_points_to_destination.union(
+                    transfer_points_in_route_to_destination
+                ) 
+        origin_destination_transfer_points = transfer_points_from_origin.intersection(
+            transfer_points_to_destination
+            )
+        for route in routeset:
+            origin_destination_transfer_points_aux = deepcopy(origin_destination_transfer_points)
+            # Path without transfers
             if origin_id in route and destination_id in route:
-                # MUST INITIALIZE WITH LARGEST INTEGER POSSIBLE
                 origin_id_index = route.index(origin_id)
                 destination_id_index = route.index(destination_id)
                 if origin_id_index < destination_id_index:
@@ -25,16 +239,33 @@ class SEAMO2:
                     path = route[destination_id_index:origin_id_index + 1]
                 else:
                     return 0
-                path_links = list(zip(path, path[1:]))
-                path_travel_time = 0
-                for path_link in path_links:
-                    origin_access_point = self.transport_network.graph[path_link[0]]
-                    destination_access_point = path_link[1]
-                    for access_point_link in origin_access_point.links:
-                        if access_point_link.destination.id == destination_access_point:
-                            path_travel_time += access_point_link.travel_time
+                path_travel_time = self.compute_path_travel_time(path)
                 if path_travel_time < shortest_path_travel_time:
                     shortest_path_travel_time = path_travel_time
+            # Path with one transfer
+            elif len(origin_destination_transfer_points) != 0:
+                if origin_id in route:
+                    origin_id_index = route.index(origin_id)
+                    routes_with_destination_aux = deepcopy(routes_with_destination)
+                    shortest_path_travel_time = self.get_one_transfer_path_travel_time(
+                        origin_destination_transfer_points_aux,
+                        route,
+                        destination_id,
+                        origin_id_index,
+                        routes_with_destination,
+                        routes_with_destination_aux,
+                        shortest_path_travel_time
+                    )
+            # Path with two transfers
+            elif len(origin_destination_transfer_points) == 0:
+                shortest_path_travel_time = get_two_transfers_path_travel_time(
+                    origin_id,
+                    route,
+                    routeset,
+                    transfer_points_from_origin,
+                    transfer_points_to_destination,
+                    routes_with_destination
+                )
         return shortest_path_travel_time
 
     def calculate_passenger_cost(self, routeset_size, routeset, demand_matrix):
