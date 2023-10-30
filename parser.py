@@ -39,7 +39,6 @@ class DemandMatrixParser:
             line = line.rstrip()
             if line == '':
                 continue
-            line = line[0:-1]
             line = line.split()
             int_line = []
             for value in line:

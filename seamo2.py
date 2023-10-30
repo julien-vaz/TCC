@@ -270,14 +270,14 @@ class SEAMO2:
 
     def calculate_passenger_cost(self, routeset_size, routeset, demand_matrix):
         numerator = 0
-        for i in range(routeset_size):
-            for j in range(routeset_size):
+        for i in range(len(self.transport_network.graph)):
+            for j in range(len(self.transport_network.graph)):
                 shortest_path_travel_time_from_i_to_j = self.get_shortest_path_travel_time(routeset, i, j)
                 partial_numerator = demand_matrix.demand_matrix[i][j] * shortest_path_travel_time_from_i_to_j
                 numerator += partial_numerator
         denominator = 0
-        for i in range(routeset_size):
-            for j in range(routeset_size):
+        for i in range(len(self.transport_network.graph)):
+            for j in range(len(self.transport_network.graph)):
                 denominator += demand_matrix.demand_matrix[i][j]
         passenger_cost = numerator / denominator
         return passenger_cost
