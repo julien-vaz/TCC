@@ -113,12 +113,12 @@ class InitialPopulationGenerator:
 
     def generate_initial_population(self, population_size, transport_network):
         print("Initial population is being generated...")
-        population = []
+        population = {}
         routeset_index = 0
         while len(population) < population_size:
             routeset = self.generate_routeset(transport_network)
-            if routeset not in population and routeset != False:
-                population.append([routeset_index, routeset])
+            if routeset not in population.values() and routeset != False:
+                population[routeset_index] = routeset
                 routeset_index += 1
         print("Initial population has been successfully generated.")
         return population

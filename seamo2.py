@@ -410,6 +410,9 @@ class SEAMO2:
                     break
             chosen_route = tuple(chosen_route)
             modified_routeset.append(chosen_route)
+        if len(modified_routeset) < len(routeset):
+            for route in aux_routeset:
+                modified_routeset.append(route)
         modified_routeset = set(modified_routeset)    
         return modified_routeset
 
@@ -451,11 +454,13 @@ class SEAMO2:
                     break
             chosen_route = tuple(chosen_route)
             modified_routeset.append(chosen_route)
+        if len(modified_routeset) < len(routeset):
+            for route in aux_routeset:
+                modified_routeset.append(route)
         modified_routeset = set(modified_routeset)
         return modified_routeset
 
-    #TODO: NEED TO FIND AND FIX BUGS
-    # FIXED DELETE ACCESS POINTS
+
     def mutation(
         self,
         individual,
@@ -489,10 +494,16 @@ class SEAMO2:
         self,
         parent,
         parent_index,
-        offspring
+        offspring,
+        offspring_passenger_cost,
+        offspring_operator_cost,
+        passenger_cost,
+        operator_cost
         ):
-        self.initial_population_generator.population.remove([parent_index, parent])
-        self.initial_population_generator.population.insert(parent_index, [parent_index, offspring])
+        self.initial_population_generator.population[parent_index] = offspring
+        passenger_cost[parent_index] = offspring_passenger_cost
+        operator_cost[parent_index] = offspring_operator_cost
+
         
     def replace_random_parent(
         self,
@@ -500,7 +511,11 @@ class SEAMO2:
         parent1_index,
         parent2,
         parent2_index,
-        offspring
+        offspring,
+        offspring_passenger_cost,
+        offspring_operator_cost,
+        passenger_cost,
+        operator_cost
         ):
         parent_index = int()
         chosen_parent = choice([parent1, parent2])
@@ -511,48 +526,51 @@ class SEAMO2:
         seamo2.replace_parents_with_offspring(
             chosen_parent,
             parent_index,
-            offspring
+            offspring,
+            offspring_passenger_cost,
+            offspring_operator_cost,
+            passenger_cost,
+            operator_cost
             )
 
     def evaluate_population(self):
-        passenger_cost = []
+        passenger_cost = {}
         best_routeset_so_far_passenger_cost = []
-        operator_cost = []
+        operator_cost = {}
         best_routeset_so_far_operator_cost = []
-        for routeset_id, routeset in self.initial_population_generator.population:
+        for routeset_id, routeset in self.initial_population_generator.population.items():
             routeset_passenger_cost = self.calculate_passenger_cost(
                     self.initial_population_generator.routeset_size,
                     routeset,
                     self.demand_matrix
                 )
-            passenger_cost.append([routeset_id, routeset, routeset_passenger_cost])
+            passenger_cost[routeset_id] = routeset_passenger_cost
             
             routeset_operator_cost = self.calculate_operator_cost(routeset)
-            operator_cost.append([routeset_id, routeset, routeset_operator_cost])
+            operator_cost[routeset_id] = routeset_operator_cost
 
-        lowest_passenger_cost = passenger_cost[0][2]
-        for routeset_index, routeset, routeset_passenger_cost in passenger_cost:
-            if routeset_passenger_cost < lowest_passenger_cost:
-                lowest_passenger_cost = routeset_passenger_cost
-        for routeset_index, routeset, routeset_passenger_cost in passenger_cost:
+        lowest_passenger_cost = min(passenger_cost.values())
+        for routeset_index, routeset_passenger_cost in passenger_cost.items():
             if routeset_passenger_cost == lowest_passenger_cost:
+                routeset = seamo2.initial_population_generator.population[routeset_index]
                 best_routeset_so_far_passenger_cost = [
                     routeset_index,
                     routeset,
-                    routeset_passenger_cost
+                    lowest_passenger_cost
                     ]
+                break
 
-        lowest_operator_cost = operator_cost[0][2]
-        for routeset_index, routeset, routeset_operator_cost in operator_cost:
-            if routeset_operator_cost < lowest_operator_cost:
-                lowest_operator_cost = routeset_operator_cost
-        for routeset_index, routeset, routeset_operator_cost in operator_cost:
+        lowest_operator_cost = min(operator_cost.values())
+        for routeset_index, routeset_operator_cost in operator_cost.items():
             if routeset_operator_cost == lowest_operator_cost:
+                routeset = seamo2.initial_population_generator.population[routeset_index]
                 best_routeset_so_far_operator_cost = [
                     routeset_index,
                     routeset,
                     routeset_operator_cost
                     ]
+                break
+
         return passenger_cost, operator_cost, best_routeset_so_far_passenger_cost, best_routeset_so_far_operator_cost
 
 seamo2 = SEAMO2()
@@ -589,9 +607,9 @@ plt.show()
 
 
 print("BEFORE SEAMO2 IMPROVEMENT\n")
-
-'''for i, routeset in enumerate(seamo2.initial_population_generator.population):
-    print(f'Routeset {i}:\n')
+"""
+for routeset_index, routeset in seamo2.initial_population_generator.population:
+    print(f'Routeset {routeset_index}:\n')
     nodes = parser.get_access_points_id(seamo2.transport_network.graph)
     colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple']
     figure = 2 
@@ -617,37 +635,57 @@ print("BEFORE SEAMO2 IMPROVEMENT\n")
         nx.draw_networkx_nodes(graph, route_nodes_positions, route_nodes, node_color=color)
         nx.draw_networkx_edges(graph, route_nodes_positions, route_edges, edge_color=color, width=2)        
         figure += 1
-    plt.show()                
+#    plt.show()                
     print()
 
-    print("Passenger cost: {:.2f}\n".format(passenger_cost[i][2]))
-    print("Operator cost: {:.2f}\n".format(operator_cost[i][2]))
-'''    
+    print("Passenger cost: {:.2f}\n".format(passenger_cost[routeset_index][2]))
+    print("Operator cost: {:.2f}\n".format(operator_cost[routeset_index][2]))
+"""    
 print(f"Best routeset for passenger cost: Routeset {best_routeset_so_far_passenger_cost[0]}\n")
 print(f"Best routeset for operator cost: Routeset {best_routeset_so_far_operator_cost[0]}\n")
 
-
+population_before = deepcopy(seamo2.initial_population_generator.population)
 generations = int(input("How many generations do you want? "))
 for _ in range(generations):
-    (
-        passenger_cost,
-        operator_cost,
-        best_routeset_so_far_passenger_cost,
-        best_routeset_so_far_operator_cost
-    ) = seamo2.evaluate_population()
 
-    mated_parents = []
-    for parent1_index, parent1 in seamo2.initial_population_generator.population:
-        parent1 = set(parent1)
-        if parent1 in mated_parents:
-            continue
-        mated_parents.append(parent1)
-        parent2_index, parent2 = choice(seamo2.initial_population_generator.population)
-        parent2 = set(parent2)
-        if parent2 in mated_parents:
-            continue
-        mated_parents.append(parent2)
+    print(f"Best passenger cost: {best_routeset_so_far_passenger_cost[2]}")
+    print(f"Best operator cost: {best_routeset_so_far_operator_cost[2]}")
+
+    population_data = []
+    passenger_cost_values = []
+    operator_cost_values = []
+    for routeset_index, routeset in seamo2.initial_population_generator.population.items():
+        routeset_passenger_cost_value = passenger_cost[routeset_index]
+        routeset_operator_cost_value = operator_cost[routeset_index]
+        passenger_cost_values.append(routeset_passenger_cost_value)
+        operator_cost_values.append(routeset_operator_cost_value)
+        population_data.append((routeset_passenger_cost_value, routeset_operator_cost_value))
+    plt.scatter(passenger_cost_values, operator_cost_values)
+    #plt.plot(passenger_cost_values, operator_cost_values)
+    plt.xlabel("Passenger cost")
+    plt.ylabel("Operator cost")
+    plt.show()
+
+
+    aux_population = list(seamo2.initial_population_generator.population.keys())
+    #TODO: For each individual in the population
+    while :
+        parent1_index = aux_population[0]
+        parent1 = seamo2.initial_population_generator.population[parent1_index]
+        aux_population.remove(parent1_index)
+        parent2_index = choice(aux_population)
+        parent2 = seamo2.initial_population_generator.population[parent2_index]
+        aux_population.append(parent1_index)
         if parent1 != parent2:
+            if (
+                (parent1_index, parent2_index) not in mated_individuals
+                or
+                (parent2_index, parent1_index) not in mated_individuals
+                ):
+                mated_individuals.add((parent1_index, parent2_index))
+                mated_individuals.add((parent2_index, parent1_index))
+            else:
+                continue
             offspring = seamo2.crossover(parent1, parent2)
             all_access_points = parser.get_access_points_id(seamo2.transport_network.graph)
             # get used access points on routeset
@@ -678,36 +716,50 @@ for _ in range(generations):
                 touched_access_points,
                 all_access_points
                 )
-            for routeset_index, routeset in seamo2.initial_population_generator.population:
+            offspring_is_duplicate = False
+            for routeset in seamo2.initial_population_generator.population.values():
                 if offspring == routeset:
-                    continue
+                    offspring_is_duplicate = True
+                    break
+            if offspring_is_duplicate:
+                continue                    
             offspring_passenger_cost = seamo2.calculate_passenger_cost(
                 seamo2.initial_population_generator.routeset_size,
                 offspring,
                 seamo2.demand_matrix
                 )
             offspring_operator_cost = seamo2.calculate_operator_cost(offspring)
-            parent1_passenger_cost = passenger_cost[parent1_index][2]
-            parent1_operator_cost = operator_cost[parent1_index][2]
+            parent1_passenger_cost = passenger_cost[parent1_index]
+            parent1_operator_cost = operator_cost[parent1_index] 
+
             if offspring_passenger_cost < parent1_passenger_cost and offspring_operator_cost < parent1_operator_cost:
+                
                 seamo2.replace_parents_with_offspring(
                     parent1,
                     parent1_index,
                     offspring,
+                    offspring_passenger_cost,
+                    offspring_operator_cost,
+                    passenger_cost,
+                    operator_cost
                     )
                 continue
-            parent2_passenger_cost = passenger_cost[parent2_index][2]
-            parent2_operator_cost = operator_cost[parent2_index][2]
+            parent2_passenger_cost = passenger_cost[parent2_index]
+            parent2_operator_cost = operator_cost[parent2_index]
             if offspring_passenger_cost < parent2_passenger_cost and offspring_operator_cost < parent2_operator_cost:
                 seamo2.replace_parents_with_offspring(
                     parent2,
                     parent2_index,
                     offspring,
+                    offspring_passenger_cost,
+                    offspring_operator_cost,
+                    passenger_cost,
+                    operator_cost
                     )
                 continue
             if (offspring_passenger_cost < best_routeset_so_far_passenger_cost[2]
                 and
-                offspring_operator_cost < operator_cost[best_routeset_so_far_passenger_cost[0]][2]):
+                offspring_operator_cost < operator_cost[best_routeset_so_far_passenger_cost[0]]):
                 best_routeset_so_far_passenger_cost = [
                     best_routeset_so_far_passenger_cost[0],
                     offspring,
@@ -719,11 +771,15 @@ for _ in range(generations):
                     parent2,
                     parent2_index,
                     offspring,
+                    offspring_passenger_cost,
+                    offspring_operator_cost,
+                    passenger_cost,
+                    operator_cost
                     )                    
                 continue
             if (offspring_operator_cost < best_routeset_so_far_operator_cost[2]
                 and
-                offspring_passenger_cost < passenger_cost[best_routeset_so_far_operator_cost[0]][2]
+                offspring_passenger_cost < passenger_cost[best_routeset_so_far_operator_cost[0]]
                 ):
                 best_routeset_so_far_operator_cost = [
                     best_routeset_so_far_operator_cost[0],
@@ -736,6 +792,10 @@ for _ in range(generations):
                     parent2,
                     parent2_index,
                     offspring,
+                    offspring_passenger_cost,
+                    offspring_operator_cost,
+                    passenger_cost,
+                    operator_cost
                     )
                 continue
             if offspring_passenger_cost < best_routeset_so_far_passenger_cost[2]:
@@ -750,6 +810,10 @@ for _ in range(generations):
                     parent2,
                     parent2_index,
                     offspring,
+                    offspring_passenger_cost,
+                    offspring_operator_cost,
+                    passenger_cost,
+                    operator_cost
                     )
                 continue
             if offspring_operator_cost < best_routeset_so_far_operator_cost[2]:
@@ -764,6 +828,10 @@ for _ in range(generations):
                     parent2,
                     parent2_index,
                     offspring,
+                    offspring_passenger_cost,
+                    offspring_operator_cost,
+                    passenger_cost,
+                    operator_cost
                     )
                 continue        
             if (
@@ -783,22 +851,22 @@ for _ in range(generations):
                     and
                     offspring_operator_cost >= parent2_operator_cost)
                 ):
-                for routeset_index, routeset in seamo2.initial_population_generator.population:
-                    routeset_passenger_cost = passenger_cost[routeset_index][2]
-                    routeset_operator_cost = operator_cost[routeset_index][2]
+                for routeset_index, routeset in seamo2.initial_population_generator.population.items():
+                    routeset_passenger_cost = passenger_cost[routeset_index]
+                    routeset_operator_cost = operator_cost[routeset_index]
                     if (offspring_passenger_cost < routeset_passenger_cost
                         and
                         offspring_operator_cost < routeset_operator_cost):
-                        seamo2.initial_population_generator.population.remove([routeset_index, routeset])
-                        seamo2.initial_population_generator.population.insert(routeset_index, [routeset_index, offspring])
-                        continue
+                        seamo2.initial_population_generator.population[routeset_index] = offspring
+                        passenger_cost[routeset_index] = offspring_passenger_cost
+                        operator_cost[routeset_index] = offspring_operator_cost
             else:
                 continue
 
 print("AFTER SEAMO2 IMPROVEMENT\n")
-
-'''for i, routeset in enumerate(seamo2.initial_population_generator.population):
-    print(f'Routeset {i}:\n')
+"""
+for routeset_index, routeset in seamo2.initial_population_generator.population:
+    print(f'Routeset {routeset_index}:\n')
     nodes = parser.get_access_points_id(seamo2.transport_network.graph)
     colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple']
     figure = 2 
@@ -824,11 +892,11 @@ print("AFTER SEAMO2 IMPROVEMENT\n")
         nx.draw_networkx_nodes(graph, route_nodes_positions, route_nodes, node_color=color)
         nx.draw_networkx_edges(graph, route_nodes_positions, route_edges, edge_color=color, width=2)        
         figure += 1
-    plt.show()                
+#    plt.show()                
     print()
 
-    print("Passenger cost: {:.2f}\n".format(passenger_cost[i][2]))
-    print("Operator cost: {:.2f}\n".format(operator_cost[i][2]))
-    '''
+    print("Passenger cost: {:.2f}\n".format(passenger_cost[routeset_index][2]))
+    print("Operator cost: {:.2f}\n".format(operator_cost[routeset_index][2]))
+    """
 print(f"Best routeset for passenger cost: Routeset {best_routeset_so_far_passenger_cost[0]}\n")
 print(f"Best routeset for operator cost: Routeset {best_routeset_so_far_operator_cost[0]}\n")
