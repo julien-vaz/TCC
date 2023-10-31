@@ -10,6 +10,7 @@ def add_unused_access_points(
     unused_access_points,
     touched_access_points
     ):
+    chosen_route = list(chosen_route)
     if position == -1:
         position = len(chosen_route)
     terminal_neighborhood = set(parser.get_access_points_id(terminal.get_neighborhood()))
@@ -19,6 +20,7 @@ def add_unused_access_points(
         new_terminal = choice(possible_unused_nodes_terminal)
         touched_access_points.add(new_terminal)
         chosen_route.insert(position, new_terminal)
+    chosen_route = tuple(chosen_route)
     return chosen_route, touched_access_points
 
 
@@ -32,14 +34,14 @@ def repair(
     minimum_length,
     transport_network
     ):
-    aux_routeset = deepcopy(routeset)
+    aux_routeset = deepcopy(list(routeset))
     repaired_routeset = []
     while aux_routeset != []:
         chosen_route = choice(aux_routeset)
         aux_routeset.remove(chosen_route)
         if len(chosen_route) < maximum_length:
             # add possible unused access points to either ends
-            unused_access_points = all_access_points - touched_access_points
+            unused_access_points = set(all_access_points) - touched_access_points
             
             # MAYBE TOO MANY ITERATIONS
             for _ in range(2 * network_size):
@@ -78,7 +80,7 @@ def repair(
                     terminal1,
                     0,
                     unused_access_points,
-                    touched_access_points
+                    touched_access_points,
                     )
                 unused_access_points = all_access_points - touched_access_points
                 
@@ -91,6 +93,7 @@ def repair(
                     )
                 unused_access_points = all_access_points - touched_access_points
         repaired_routeset.append(chosen_route)
+    repaired_routeset = set(repaired_routeset)
     if len(touched_access_points) == network_size:
         return repaired_routeset
     return False
@@ -111,10 +114,12 @@ class InitialPopulationGenerator:
     def generate_initial_population(self, population_size, transport_network):
         print("Initial population is being generated...")
         population = []
+        routeset_index = 0
         while len(population) < population_size:
             routeset = self.generate_routeset(transport_network)
             if routeset not in population and routeset != False:
-                population.append(routeset)
+                population.append([routeset_index, routeset])
+                routeset_index += 1
         print("Initial population has been successfully generated.")
         return population
         
@@ -123,7 +128,7 @@ class InitialPopulationGenerator:
         print("Generating routeset...")
         network_size = len(transport_network.graph)
 
-        routes = [[]] 
+        routes = [[]]
 
         touched_access_points = set()
         regrow_route = False
@@ -189,13 +194,22 @@ class InitialPopulationGenerator:
                 print(f"Route {count} has been successfully generated.")
                 regrow_route = False
                 count += 1
+        
+        routeset = set()
+        for route in routes:
+            route = tuple(route)
+            routeset.add(route)
         print("Routeset has been generated")
         print()
+
+        if len(routeset) != self.routeset_size:
+            print("Routeset is infeasible. It will be discarded from the population.")
+            return False
         
         if len(touched_access_points) < network_size:
             print("Starting repair of routeset...")
             repaired_routeset = repair(
-                routes,
+                routeset,
                 all_access_points_ids,
                 touched_access_points,
                 network_size,
@@ -211,4 +225,4 @@ class InitialPopulationGenerator:
                 print("Routeset is infeasible. It will be discarded from the population.")
                 return False
             
-        return routes
+        return routeset

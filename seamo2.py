@@ -59,7 +59,9 @@ class SEAMO2:
             second_path = chosen_second_route[
                 destination_id_index_second_route:chosen_transfer_point_index_second_route + 1
                 ]
+            second_path = list(second_path)
             second_path.reverse()
+            second_path = tuple(second_path)
         return second_path, routes_with_destination_aux
 
     def get_one_transfer_path_travel_time(
@@ -106,7 +108,9 @@ class SEAMO2:
                     if chosen_transfer_point not in chosen_second_route:
                         continue
                     path = route[chosen_transfer_point_index:origin_id_index + 1]
+                    path = list(path)
                     path.reverse()
+                    path = tuple(path)
                     second_path, routes_with_destination_aux = self.find_second_path(
                         routes_with_destination_aux,
                         destination_id,
@@ -124,16 +128,18 @@ class SEAMO2:
     def get_two_transfers_path_travel_time(
         self,
         origin_id,
+        destination_id,
         route,
         routeset,
         transfer_points_from_origin,
         transfer_points_to_destination,
-        routes_with_destination
+        routes_with_destination,
+        shortest_path_travel_time
         ):
         routes_with_destination_aux = deepcopy(routes_with_destination)
         if origin_id in route:
             origin_id_index = route.index(origin_id)
-            transfer_points_from_origin_aux = transfer_points_from_origin
+            transfer_points_from_origin_aux = list(transfer_points_from_origin)
             while len(transfer_points_from_origin_aux) != 0:
                 chosen_transfer_point_from_origin = choice(transfer_points_from_origin_aux)
                 transfer_points_from_origin_aux.remove(chosen_transfer_point_from_origin)
@@ -144,12 +150,16 @@ class SEAMO2:
                     first_path = route[origin_id_index:chosen_transfer_point_from_origin_index + 1]
                 elif origin_id_index > chosen_transfer_point_from_origin_index:
                     first_path = route[chosen_transfer_point_from_origin_index:origin_id_index + 1]
+                    
+                    first_path = list(first_path)
                     first_path.reverse()
-                transfer_points_to_destination_aux = transfer_points_to_destination
+                    first_path = tuple(first_path)
+                transfer_points_to_destination_aux = list(transfer_points_to_destination)
                 while len(transfer_points_to_destination_aux) != 0:
                     chosen_transfer_point_to_destination = choice(transfer_points_to_destination_aux)
                     transfer_points_to_destination_aux.remove(chosen_transfer_point_to_destination)
-                    routes_with_destination_aux.remove(route)
+                    if route in routes_with_destination_aux:
+                        routes_with_destination_aux.remove(route)
                     for second_route in routes_with_destination_aux:
                         if chosen_transfer_point_to_destination not in second_route:
                             continue
@@ -159,7 +169,9 @@ class SEAMO2:
                             second_path = second_route[chosen_transfer_point_to_destination_index:destination_id_index + 1]
                         elif destination_id_index < chosen_transfer_point_to_destination_index:
                             second_path = second_route[destination_id_index: chosen_transfer_point_to_destination_index + 1]
+                            second_path = list(second_path)
                             second_path.reverse()
+                            second_path = tuple(second_path)
                         routeset_aux = deepcopy(routeset)
                         routeset_aux.remove(route)
                         routeset_aux.remove(second_route)
@@ -196,7 +208,9 @@ class SEAMO2:
                                     :
                                     chosen_transfer_point_from_origin_index_third_route
                                 ]
+                                third_path = list(third_path)
                                 third_path.reverse()
+                                third_path = tuple(third_path)
                             path = first_path + third_path[1:] + second_path[1:]
                             path_travel_time = self.compute_path_travel_time(path)
                             if path_travel_time < shortest_path_travel_time:
@@ -258,13 +272,15 @@ class SEAMO2:
                     )
             # Path with two transfers
             elif len(origin_destination_transfer_points) == 0:
-                shortest_path_travel_time = get_two_transfers_path_travel_time(
+                shortest_path_travel_time = self.get_two_transfers_path_travel_time(
                     origin_id,
+                    destination_id,
                     route,
                     routeset,
                     transfer_points_from_origin,
                     transfer_points_to_destination,
-                    routes_with_destination
+                    routes_with_destination,
+                    shortest_path_travel_time
                 )
         return shortest_path_travel_time
 
@@ -293,11 +309,11 @@ class SEAMO2:
                         operator_cost += link.travel_time
         return operator_cost
 
-    # TODO: NEED TO FIND AND FIX BUG
+
     def crossover(self, parent1, parent2):
         offspring = []
-        parent1_copy = deepcopy(parent1)
-        parent2_copy = deepcopy(parent2)
+        parent1_copy = list(deepcopy(parent1))
+        parent2_copy = list(deepcopy(parent2))
         seed = choice(parent1_copy)
         parent1_copy.remove(seed)
         offspring.append(seed)
@@ -319,10 +335,11 @@ class SEAMO2:
                 if len(intersection) < smallest_intersection:
                     smallest_intersection = len(intersection)
                     next_route = route
-                    chosen_parent.remove(next_route)
-                    offspring.append(next_route)
+            chosen_parent.remove(next_route)
+            offspring.append(next_route)
             seed = seed.union(set(next_route))
             first_parent = not first_parent
+        offspring = set(offspring)
         return offspring
 
     
@@ -335,17 +352,20 @@ class SEAMO2:
         touched_access_points,
         all_access_points
         ):
-        aux_routeset = deepcopy(routeset)
+        aux_routeset = list(deepcopy(routeset))
         modified_routeset = []
         added_access_points = 0
         while added_access_points < access_points_to_be_changed:
+            if len(aux_routeset) == 0:
+                break
             chosen_route = choice(aux_routeset)
             aux_routeset.remove(chosen_route)
             route_cannot_be_modified_anymore = False
-            while len(touched_access_points) < len(all_access_points):
+            while True:
                 if route_cannot_be_modified_anymore:
                     break
-                terminal1 = chosen_route[0]
+                terminal1_id = chosen_route[0]
+                terminal1 = self.transport_network.get_by_id(terminal1_id)
                 access_points_touched_before = deepcopy(touched_access_points)
                 if len(chosen_route) < self.initial_population_generator.maximum_length:
                     chosen_route, touched_access_points = ipg.add_unused_access_points(
@@ -360,7 +380,8 @@ class SEAMO2:
                     route_cannot_be_modified_anymore = False
                 else:
                     route_cannot_be_modified_anymore = True
-                terminal2 = chosen_route[-1]
+                terminal2_id = chosen_route[-1]
+                terminal2 = self.transport_network.get_by_id(terminal2_id)
                 access_points_touched_before = deepcopy(touched_access_points)
                 if len(chosen_route) < self.initial_population_generator.maximum_length:
                     chosen_route, touched_access_points = ipg.add_unused_access_points(
@@ -376,6 +397,7 @@ class SEAMO2:
                 else:
                     route_cannot_be_modified_anymore = True
             modified_routeset.append(chosen_route)
+        modified_routeset = set(modified_routeset)    
         return modified_routeset
 
     def delete_access_point(
@@ -385,6 +407,7 @@ class SEAMO2:
         position,
         aux_routeset
         ):
+        chosen_route = list(chosen_route)
         for route in aux_routeset:
             if terminal in route:
                 chosen_route.remove(terminal)
@@ -393,25 +416,29 @@ class SEAMO2:
         chosen_route_access_points = set(chosen_route)
         for route in aux_routeset:
             route_access_points = set(route)
-            if chosen_route.isdisjoint(route_access_points):
+            if chosen_route_access_points.isdisjoint(route_access_points):
                 unfeasible = True
             else:
                 unfeasible = False
         if unfeasible:
             chosen_route.insert(terminal, position)
+        chosen_route = tuple(chosen_route)
         return chosen_route, unfeasible
 
     def delete_access_points(self, routeset, access_points_to_be_changed):
-        aux_routeset = deepcopy(routeset)
+        aux_routeset = list(deepcopy(routeset))
         modified_routeset = []
         deleted_access_points = 0
+        previous_route = []
         while deleted_access_points < access_points_to_be_changed:
+            if len(aux_routeset) == 0:
+                break
             chosen_route = choice(aux_routeset)
             chosen_route_index = aux_routeset.index(chosen_route)
             aux_routeset.remove(chosen_route)
             aux_routeset2 = deepcopy(aux_routeset)
-            if previous_route is not None:
-                aux_routeset2.insert(previous_route, previous_route_index)
+            if len(previous_route) != 0:
+                aux_routeset2.insert(previous_route_index, previous_route)
             route_cannot_be_modified_anymore = False
             while not route_cannot_be_modified_anymore:
                 terminal1 = chosen_route[0]
@@ -422,8 +449,11 @@ class SEAMO2:
                         terminal1,
                         0,
                         aux_routeset2)
+                else:
+                    break
                 if len(chosen_route) < length_before:
                     deleted_access_points += 1
+                
                 terminal2 = chosen_route[-1]
                 length_before = len(chosen_route)
                 if len(chosen_route) > self.initial_population_generator.minimum_length:
@@ -432,18 +462,28 @@ class SEAMO2:
                         terminal2,
                         -1,
                         aux_routeset2)
+                else:
+                    break
                 if len(chosen_route) < length_before:
                     deleted_access_points += 1
             previous_route = chosen_route
             previous_route_index = chosen_route_index
             modified_routeset.append(chosen_route)
+        modified_routeset = set(modified_routeset)
         return modified_routeset
 
-    def mutation(self, individual, absent_access_points, touched_access_points):
+    #TODO: NEED TO FIND AND FIX BUGS
+    def mutation(
+        self,
+        individual,
+        absent_access_points,
+        touched_access_points,
+        all_access_points
+        ):
         access_points_to_be_changed = randrange(
             1,
             self.initial_population_generator.routeset_size * (
-                self.initial_population_generator.maximum_length/2
+                self.initial_population_generator.maximum_length//2
             )
         )
         choice = getrandbits(1)
@@ -465,52 +505,72 @@ class SEAMO2:
     def replace_parents_with_offspring(
         self,
         parent,
-        objective1,
-        parent_objective1,
-        objective2,
-        parent_objective2,
-        offspring,
-        offspring_objective1,
-        offspring_objective2
+        parent_index,
+        offspring
         ):
-        self.initial_population_generator.population.remove(parent)
-        objective1.remove([parent, parent_objective1])
-        objective2.remove([parent, parent_objective2])
-        self.initial_population_generator.population.add(offspring)
-        objective1.append([offspring, offspring_objective1])
-        objective2.append([offspring, offspring_objective2])
+        self.initial_population_generator.population.remove([parent_index, parent])
+        self.initial_population_generator.population.insert(parent_index, [parent_index, offspring])
         
     def replace_random_parent(
         self,
-        passenger_cost,
-        operator_cost,
         parent1,
+        parent1_index,
         parent2,
-        parent1_passenger_cost,
-        parent1_operator_cost,
-        parent2_passenger_cost,
-        parent2_operator_cost,
-        offspring,
-        offspring_passenger_cost,
-        offspring_operator_cost
+        parent2_index,
+        offspring
         ):
+        parent_index = int()
         chosen_parent = choice([parent1, parent2])
         if chosen_parent == parent1:
-            parent_passenger_cost = parent1_passenger_cost
-            parent_operator_cost = parent1_operator_cost
+            parent_index = parent1_index
         elif chosen_parent == parent2:
-            parent_passenger_cost = parent2_passenger_cost
-            parent_operator_cost = parent2_operator_cost
+            parent_index = parent2_index
         seamo2.replace_parents_with_offspring(
             chosen_parent,
-            passenger_cost,
-            parent_passenger_cost,
-            operator_cost,
-            parent_operator_cost,
-            offspring,
-            offspring_passenger_cost,
-            offspring_operator_cost
+            parent_index,
+            offspring
             )
+
+    def evaluate_population(self):
+        passenger_cost = []
+        best_routeset_so_far_passenger_cost = []
+        operator_cost = []
+        best_routeset_so_far_operator_cost = []
+        for routeset_id, routeset in self.initial_population_generator.population:
+            routeset_passenger_cost = self.calculate_passenger_cost(
+                    self.initial_population_generator.routeset_size,
+                    routeset,
+                    self.demand_matrix
+                )
+            passenger_cost.append([routeset_id, routeset, routeset_passenger_cost])
+            
+            routeset_operator_cost = self.calculate_operator_cost(routeset)
+            operator_cost.append([routeset_id, routeset, routeset_operator_cost])
+
+        lowest_passenger_cost = passenger_cost[0][2]
+        for routeset_index, routeset, routeset_passenger_cost in passenger_cost:
+            if routeset_passenger_cost < lowest_passenger_cost:
+                lowest_passenger_cost = routeset_passenger_cost
+        for routeset_index, routeset, routeset_passenger_cost in passenger_cost:
+            if routeset_passenger_cost == lowest_passenger_cost:
+                best_routeset_so_far_passenger_cost = [
+                    routeset_index,
+                    routeset,
+                    routeset_passenger_cost
+                    ]
+
+        lowest_operator_cost = operator_cost[0][2]
+        for routeset_index, routeset, routeset_operator_cost in operator_cost:
+            if routeset_operator_cost < lowest_operator_cost:
+                lowest_operator_cost = routeset_operator_cost
+        for routeset_index, routeset, routeset_operator_cost in operator_cost:
+            if routeset_operator_cost == lowest_operator_cost:
+                best_routeset_so_far_operator_cost = [
+                    routeset_index,
+                    routeset,
+                    routeset_operator_cost
+                    ]
+        return passenger_cost, operator_cost, best_routeset_so_far_passenger_cost, best_routeset_so_far_operator_cost
 
 seamo2 = SEAMO2()
 
@@ -537,206 +597,17 @@ pos = {
 nx.draw_networkx(graph, pos, with_labels=True)
 plt.show()
 
+(
+    passenger_cost,
+    operator_cost,
+    best_routeset_so_far_passenger_cost,
+    best_routeset_so_far_operator_cost
+) = seamo2.evaluate_population()
 
-passenger_cost = []
-best_routeset_so_far_passenger_cost = []
-operator_cost = []
-best_routeset_so_far_operator_cost = []
-for (routeset_id, routeset) in enumerate(seamo2.initial_population_generator.population):
-    routeset_passenger_cost = seamo2.calculate_passenger_cost(
-            seamo2.initial_population_generator.routeset_size,
-            routeset,
-            seamo2.demand_matrix
-        )
-    passenger_cost.append([routeset_id, routeset, routeset_passenger_cost])
-    
-    routeset_operator_cost = seamo2.calculate_operator_cost(routeset)
-    operator_cost.append([routeset_id, routeset, routeset_operator_cost])
 
-lowest_passenger_cost = passenger_cost[0][2]
-for routeset in passenger_cost:
-    if routeset[2] < lowest_passenger_cost:
-        lowest_passenger_cost = routeset[2]
-for routeset in passenger_cost:
-    if routeset[2] == lowest_passenger_cost:
-        best_routeset_so_far_passenger_cost = routeset
+print("BEFORE SEAMO2 IMPROVEMENT\n")
 
-lowest_operator_cost = operator_cost[0][2]
-for routeset in operator_cost:
-    if routeset[2] < lowest_operator_cost:
-        lowest_operator_cost = routeset[2]
-for routeset in operator_cost:
-    if routeset[2] == lowest_operator_cost:
-        best_routeset_so_far_operator_cost = routeset
-
-'''
-generations = int(input("How many generations do you want? "))
-for _ in range(generations):
-    for parent1 in seamo2.initial_population_generator.population:
-        parent2 = choice(seamo2.initial_population_generator.population)
-        if parent1 != parent2:
-            offspring = seamo2.crossover(parent1, parent2)
-            all_access_points = parser.get_access_points_id(seamo2.transport_network.graph)
-            # get used access points on routeset
-            touched_access_points = set()
-            for route in offspring:
-                touched_access_points.union(set(route))
-            if len(touched_access_points) < len(seamo2.transport_network.graph): 
-                offspring = ipg.repair(
-                    offspring,
-                    all_access_points,
-                    touched_access_points,
-                    len(seamo2.transport_network.graph),
-                    seamo2.initial_population_generator.routeset_size,
-                    seamo2.initial_population_generator.maximum_length,
-                    seamo2.initial_population_generator.minimum_length,
-                    seamo2.transport_network
-                    )
-                if offspring == False:
-                    continue
-            # update used access points on routeset
-            for route in offspring:
-                touched_access_points.union(set(route))
-            # calculate absent access points from routeset
-            absent_access_points = all_access_points - touched_access_points
-            offspring = seamo2.mutation(
-                offspring,
-                absent_access_points,
-                touched_access_points,
-                all_access_points
-                )
-            if offspring in seamo2.initial_population_generator.population:
-                continue
-            offspring_passenger_cost = seamo2.calculate_passenger_cost(
-                seamo2.initial_population_generator.routeset_size,
-                offspring,
-                seamo2.demand_matrix
-                )
-            offspring_operator_cost = seamo2.calculate_operator_cost(offspring)
-            parent1_passenger_cost = seamo2.calculate_passenger_cost(
-                seamo2.initial_population_generator.routeset_size,
-                parent1,
-                seamo2.demand_matrix
-            )
-            parent1_operator_cost = seamo2.calculate_operator_cost(parent1)
-            if offspring_passenger_cost < parent1_passenger_cost and offspring_operator_cost < parent1_operator_cost:
-                seamo2.replace_parents_with_offspring(
-                    parent1,
-                    passenger_cost,
-                    parent1_passenger_cost,
-                    operator_cost,
-                    parent1_operator_cost,
-                    offspring,
-                    offspring_passenger_cost,
-                    offspring_operator_cost
-                    )
-                continue
-            parent2_passenger_cost = seamo2.calculate_passenger_cost(
-                seamo2.initial_population_generator.routeset_size,
-                parent2,
-                seamo2.demand_matrix
-            )
-            parent2_operator_cost = seamo2.calculate_operator_cost(parent2)
-            if offspring_passenger_cost < parent2_passenger_cost and offspring_operator_cost < parent2_operator_cost:
-                seamo2.replace_parents_with_offspring(
-                    parent2,
-                    passenger_cost,
-                    parent2_passenger_cost,
-                    operator_cost,
-                    parent2_operator_cost,
-                    offspring,
-                    offspring_passenger_cost,
-                    offspring_operator_cost
-                    )
-                continue
-            if (offspring_passenger_cost < best_routeset_so_far_passenger_cost[1]
-                and
-                offspring_operator_cost < calculate_operator_cost(best_routeset_so_far_passenger_cost[0])):
-                best_routeset_so_far_passenger_cost = [offspring, offspring_passenger_cost]
-                seamo2.replace_random_parent(
-                    passenger_cost,
-                    operator_cost,
-                    parent1,
-                    parent2,
-                    parent1_passenger_cost,
-                    parent1_operator_cost,
-                    parent2_passenger_cost,
-                    parent2_operator_cost,
-                    offspring,
-                    offspring_passenger_cost,
-                    offspring_operator_cost
-                    )                    
-                continue
-            if (offspring_operator_cost < best_routeset_so_far_operator_cost[1]
-                and
-                offspring_passenger_cost < calculate_passenger_cost(best_routeset_so_far_operator_cost[0])):
-                best_routeset_so_far_operator_cost = [offspring, offspring_operator_cost]
-                seamo2.replace_random_parent(
-                    passenger_cost,
-                    operator_cost,
-                    parent1,
-                    parent2,
-                    parent1_passenger_cost,
-                    parent1_operator_cost,
-                    parent2_passenger_cost,
-                    parent2_operator_cost,
-                    offspring,
-                    offspring_passenger_cost,
-                    offspring_operator_cost
-                    )
-                continue
-            if offspring_passenger_cost < best_routeset_so_far_passenger_cost[1]:
-                best_routeset_so_far_passenger_cost = [offspring, offspring_passenger_cost]
-                seamo2.replace_random_parent(
-                    passenger_cost,
-                    operator_cost,
-                    parent1,
-                    parent2,
-                    parent1_passenger_cost,
-                    parent1_operator_cost,
-                    parent2_passenger_cost,
-                    parent2_operator_cost,
-                    offspring,
-                    offspring_passenger_cost,
-                    offspring_operator_cost
-                    )
-                continue
-            if offspring_operator_cost < best_routeset_so_far_operator_cost[1]:
-                best_routeset_so_far_operator_cost = [offspring, offspring_operator_cost]
-                seamo2.replace_random_parent(
-                    passenger_cost,
-                    operator_cost,
-                    parent1,
-                    parent2,
-                    parent1_passenger_cost,
-                    parent1_operator_cost,
-                    parent2_passenger_cost,
-                    parent2_operator_cost,
-                    offspring,
-                    offspring_passenger_cost,
-                    offspring_operator_cost
-                    )
-                continue        
-            if (offspring_passenger_cost == parent1_passenger_cost == parent2_passenger_cost
-                and
-                offspring_operator_cost == parent1_operator_cost == parent2_operator_cost):
-                for routeset in seamo2.initial_population_generator.population:
-                    routeset_passenger_cost = passenger_cost[routeset]
-                    routeset_operator_cost = operator_cost[routeset]
-                    if (offspring_passenger_cost < routeset_passenger_cost
-                        and
-                        offspring_operator_cost < routeset_operator_cost):
-                        seamo2.initial_population_generator.population.remove(routeset)
-                        seamo2.initial_population_generator.population.add(offspring)
-                        passenger_cost.remove([routeset, routeset_passenger_cost])
-                        passenger_cost.append([offspring, offspring_passenger_cost])
-                        operator_cost.remove([routeset, routeset_operator_cost])
-                        operator_cost.append([offspring, offspring_operator_cost])
-                        continue
-            else:
-                continue
-'''
-for i, routeset in enumerate(seamo2.initial_population_generator.population):
+'''for i, routeset in enumerate(seamo2.initial_population_generator.population):
     print(f'Routeset {i}:\n')
     nodes = parser.get_access_points_id(seamo2.transport_network.graph)
     colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple']
@@ -768,6 +639,213 @@ for i, routeset in enumerate(seamo2.initial_population_generator.population):
 
     print("Passenger cost: {:.2f}\n".format(passenger_cost[i][2]))
     print("Operator cost: {:.2f}\n".format(operator_cost[i][2]))
-    
+'''    
+print(f"Best routeset for passenger cost: Routeset {best_routeset_so_far_passenger_cost[0]}\n")
+print(f"Best routeset for operator cost: Routeset {best_routeset_so_far_operator_cost[0]}\n")
+
+
+generations = int(input("How many generations do you want? "))
+for _ in range(generations):
+    (
+        passenger_cost,
+        operator_cost,
+        best_routeset_so_far_passenger_cost,
+        best_routeset_so_far_operator_cost
+    ) = seamo2.evaluate_population()
+
+    mated_parents = []
+    for parent1_index, parent1 in seamo2.initial_population_generator.population:
+        parent1 = set(parent1)
+        if parent1 in mated_parents:
+            continue
+        mated_parents.append(parent1)
+        parent2_index, parent2 = choice(seamo2.initial_population_generator.population)
+        parent2 = set(parent2)
+        if parent2 in mated_parents:
+            continue
+        mated_parents.append(parent2)
+        if parent1 != parent2:
+            offspring = seamo2.crossover(parent1, parent2)
+            all_access_points = parser.get_access_points_id(seamo2.transport_network.graph)
+            # get used access points on routeset
+            touched_access_points = set()
+            for route in offspring:
+                touched_access_points = touched_access_points.union(set(route))
+            if len(touched_access_points) < len(seamo2.transport_network.graph): 
+                offspring = ipg.repair(
+                    offspring,
+                    all_access_points,
+                    touched_access_points,
+                    len(seamo2.transport_network.graph),
+                    seamo2.initial_population_generator.routeset_size,
+                    seamo2.initial_population_generator.maximum_length,
+                    seamo2.initial_population_generator.minimum_length,
+                    seamo2.transport_network
+                    )
+                if offspring == False:
+                    continue
+            # update used access points on routeset
+            for route in offspring:
+                touched_access_points = touched_access_points.union(set(route))
+            # calculate absent access points from routeset
+            absent_access_points = set(all_access_points) - touched_access_points
+            offspring = seamo2.mutation(
+                offspring,
+                absent_access_points,
+                touched_access_points,
+                all_access_points
+                )
+            for routeset_index, routeset in seamo2.initial_population_generator.population:
+                if offspring == routeset:
+                    continue
+            offspring_passenger_cost = seamo2.calculate_passenger_cost(
+                seamo2.initial_population_generator.routeset_size,
+                offspring,
+                seamo2.demand_matrix
+                )
+            offspring_operator_cost = seamo2.calculate_operator_cost(offspring)
+            parent1_passenger_cost = passenger_cost[parent1_index][2]
+            parent1_operator_cost = operator_cost[parent1_index][2]
+            if offspring_passenger_cost < parent1_passenger_cost and offspring_operator_cost < parent1_operator_cost:
+                seamo2.replace_parents_with_offspring(
+                    parent1,
+                    parent1_index,
+                    offspring,
+                    )
+                continue
+            parent2_passenger_cost = passenger_cost[parent2_index][2]
+            parent2_operator_cost = operator_cost[parent2_index][2]
+            if offspring_passenger_cost < parent2_passenger_cost and offspring_operator_cost < parent2_operator_cost:
+                seamo2.replace_parents_with_offspring(
+                    parent2,
+                    parent2_index,
+                    offspring,
+                    )
+                continue
+            if (offspring_passenger_cost < best_routeset_so_far_passenger_cost[2]
+                and
+                offspring_operator_cost < operator_cost[best_routeset_so_far_passenger_cost[0]][2]):
+                best_routeset_so_far_passenger_cost = [
+                    best_routeset_so_far_passenger_cost[0],
+                    offspring,
+                    offspring_passenger_cost
+                    ]
+                seamo2.replace_random_parent(
+                    parent1,
+                    parent1_index,
+                    parent2,
+                    parent2_index,
+                    offspring,
+                    )                    
+                continue
+            if (offspring_operator_cost < best_routeset_so_far_operator_cost[2]
+                and
+                offspring_passenger_cost < passenger_cost[best_routeset_so_far_operator_cost[0]][2]
+                ):
+                best_routeset_so_far_operator_cost = [
+                    best_routeset_so_far_operator_cost[0],
+                    offspring,
+                    offspring_operator_cost
+                    ]
+                seamo2.replace_random_parent(
+                    parent1,
+                    parent1_index,
+                    parent2,
+                    parent2_index,
+                    offspring,
+                    )
+                continue
+            if offspring_passenger_cost < best_routeset_so_far_passenger_cost[2]:
+                best_routeset_so_far_passenger_cost = [
+                    best_routeset_so_far_passenger_cost[0],
+                    offspring,
+                    offspring_passenger_cost
+                    ]
+                seamo2.replace_random_parent(
+                    parent1,
+                    parent1_index,
+                    parent2,
+                    parent2_index,
+                    offspring,
+                    )
+                continue
+            if offspring_operator_cost < best_routeset_so_far_operator_cost[2]:
+                best_routeset_so_far_operator_cost = [
+                    best_routeset_so_far_operator_cost[0],
+                    offspring,
+                    offspring_operator_cost
+                    ]
+                seamo2.replace_random_parent(
+                    parent1,
+                    parent1_index,
+                    parent2,
+                    parent2_index,
+                    offspring,
+                    )
+                continue        
+            if (
+                    (offspring_passenger_cost >= parent1_passenger_cost
+                    and
+                    offspring_operator_cost <= parent1_operator_cost)
+                        or
+                    (offspring_passenger_cost <= parent1_passenger_cost
+                    and
+                    offspring_operator_cost >= parent1_operator_cost)
+                        or
+                    (offspring_passenger_cost >= parent2_passenger_cost
+                    and
+                    offspring_operator_cost <= parent2_operator_cost)
+                        or
+                    (offspring_passenger_cost <= parent2_passenger_cost
+                    and
+                    offspring_operator_cost >= parent2_operator_cost)
+                ):
+                for routeset_index, routeset in seamo2.initial_population_generator.population:
+                    routeset_passenger_cost = passenger_cost[routeset_index][2]
+                    routeset_operator_cost = operator_cost[routeset_index][2]
+                    if (offspring_passenger_cost < routeset_passenger_cost
+                        and
+                        offspring_operator_cost < routeset_operator_cost):
+                        seamo2.initial_population_generator.population.remove([routeset_index, routeset])
+                        seamo2.initial_population_generator.population.insert(routeset_index, [routeset_index, offspring])
+                        continue
+            else:
+                continue
+
+print("AFTER SEAMO2 IMPROVEMENT\n")
+
+'''for i, routeset in enumerate(seamo2.initial_population_generator.population):
+    print(f'Routeset {i}:\n')
+    nodes = parser.get_access_points_id(seamo2.transport_network.graph)
+    colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple']
+    figure = 2 
+    for j, route in enumerate(routeset):
+        print(f'Route {j}: [', end='')
+        route_nodes = []
+        route_nodes_positions = {}
+        for access_point_id in route:
+            route_nodes.append(access_point_id)
+            route_nodes_positions[access_point_id] = pos[access_point_id]
+            if len(route) == 1:
+                print(f'[{access_point_id}]')
+            else:
+                if access_point_id == route[-1]:
+                    print(f'{access_point_id}]')
+                else:
+                    print(f'{access_point_id} -', end=' ')
+        route_edges = list(zip(route_nodes, route_nodes[1:]))
+        color = choice(colors)
+        colors.remove(color)
+        plt.figure(figure)
+        nx.draw_networkx(graph, pos, with_labels=True)
+        nx.draw_networkx_nodes(graph, route_nodes_positions, route_nodes, node_color=color)
+        nx.draw_networkx_edges(graph, route_nodes_positions, route_edges, edge_color=color, width=2)        
+        figure += 1
+    plt.show()                
+    print()
+
+    print("Passenger cost: {:.2f}\n".format(passenger_cost[i][2]))
+    print("Operator cost: {:.2f}\n".format(operator_cost[i][2]))
+    '''
 print(f"Best routeset for passenger cost: Routeset {best_routeset_so_far_passenger_cost[0]}\n")
 print(f"Best routeset for operator cost: Routeset {best_routeset_so_far_operator_cost[0]}\n")
