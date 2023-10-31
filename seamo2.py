@@ -360,119 +360,102 @@ class SEAMO2:
                 break
             chosen_route = choice(aux_routeset)
             aux_routeset.remove(chosen_route)
-            route_cannot_be_modified_anymore = False
-            while True:
-                if route_cannot_be_modified_anymore:
-                    break
+            chosen_route = list(chosen_route)
+            while (len(chosen_route)
+                    <
+                    self.initial_population_generator.maximum_length):
+                length_before = len(chosen_route)
                 terminal1_id = chosen_route[0]
-                terminal1 = self.transport_network.get_by_id(terminal1_id)
-                access_points_touched_before = deepcopy(touched_access_points)
-                if len(chosen_route) < self.initial_population_generator.maximum_length:
-                    chosen_route, touched_access_points = ipg.add_unused_access_points(
-                        chosen_route,
-                        terminal1,
-                        0,
-                        absent_access_points,
-                        touched_access_points
-                        )
-                if len(touched_access_points) == len(access_points_touched_before) + 1:
-                    added_access_points += 1
-                    route_cannot_be_modified_anymore = False
-                else:
-                    route_cannot_be_modified_anymore = True
                 terminal2_id = chosen_route[-1]
+                terminal1 = self.transport_network.get_by_id(terminal1_id)
+                terminal1_neighborhood = set(
+                    parser.get_access_points_id(
+                        terminal1.get_neighborhood()
+                    )
+                )
+                candidates_for_addition_terminal1 = list(
+                    terminal1_neighborhood - set(chosen_route)
+                )
                 terminal2 = self.transport_network.get_by_id(terminal2_id)
-                access_points_touched_before = deepcopy(touched_access_points)
-                if len(chosen_route) < self.initial_population_generator.maximum_length:
-                    chosen_route, touched_access_points = ipg.add_unused_access_points(
-                        chosen_route,
-                        terminal2,
-                        -1,
-                        absent_access_points,
-                        touched_access_points
-                        )
-                if len(touched_access_points) == len(access_points_touched_before) + 1:
+                terminal2_neighborhood = set(
+                    parser.get_access_points_id(
+                        terminal2.get_neighborhood()
+                    )
+                )
+                candidates_for_addition_terminal2 = list(
+                    terminal2_neighborhood - set(chosen_route)
+                )
+                if (len(candidates_for_addition_terminal1) == 0
+                    and
+                    len(candidates_for_addition_terminal2) == 0 ):
+                    break
+                chosen_terminal = choice([terminal1_id, terminal2_id])
+                if chosen_terminal == terminal1_id:
+                    if len(candidates_for_addition_terminal1) > 0:
+                        chosen_access_point = choice(
+                            candidates_for_addition_terminal1
+                            )
+                        chosen_route.insert(0, chosen_access_point)
+                    else:
+                        chosen_terminal = terminal2_id
+                if chosen_terminal == terminal2_id:
+                    if len(candidates_for_addition_terminal2) > 0:
+                        chosen_access_point = choice(
+                            candidates_for_addition_terminal2
+                            )
+                        chosen_route.append(chosen_access_point)
+                if len(chosen_route) > length_before:
                     added_access_points += 1
-                    route_cannot_be_modified_anymore = False
-                else:
-                    route_cannot_be_modified_anymore = True
+                if added_access_points == access_points_to_be_changed:
+                    break
+            chosen_route = tuple(chosen_route)
             modified_routeset.append(chosen_route)
         modified_routeset = set(modified_routeset)    
         return modified_routeset
-
-    def delete_access_point(
-        self,
-        chosen_route,
-        terminal,
-        position,
-        aux_routeset
-        ):
-        chosen_route = list(chosen_route)
-        for route in aux_routeset:
-            if terminal in route:
-                chosen_route.remove(terminal)
-                break
-        unfeasible = False
-        chosen_route_access_points = set(chosen_route)
-        for route in aux_routeset:
-            route_access_points = set(route)
-            if chosen_route_access_points.isdisjoint(route_access_points):
-                unfeasible = True
-            else:
-                unfeasible = False
-        if unfeasible:
-            chosen_route.insert(terminal, position)
-        chosen_route = tuple(chosen_route)
-        return chosen_route, unfeasible
 
     def delete_access_points(self, routeset, access_points_to_be_changed):
         aux_routeset = list(deepcopy(routeset))
         modified_routeset = []
         deleted_access_points = 0
-        previous_route = []
+        access_points_occurences = {}
+        for route in routeset:
+            for access_point_id in route:
+                if access_point_id not in access_points_occurences.keys():
+                    access_points_occurences[access_point_id] = 1
+                else:
+                    access_points_occurences[access_point_id] += 1
         while deleted_access_points < access_points_to_be_changed:
             if len(aux_routeset) == 0:
                 break
             chosen_route = choice(aux_routeset)
-            chosen_route_index = aux_routeset.index(chosen_route)
             aux_routeset.remove(chosen_route)
-            aux_routeset2 = deepcopy(aux_routeset)
-            if len(previous_route) != 0:
-                aux_routeset2.insert(previous_route_index, previous_route)
-            route_cannot_be_modified_anymore = False
-            while not route_cannot_be_modified_anymore:
-                terminal1 = chosen_route[0]
-                length_before = len(chosen_route)
-                if len(chosen_route) > self.initial_population_generator.minimum_length:
-                    chosen_route, route_cannot_be_modified_anymore = self.delete_access_point(
-                        chosen_route,
-                        terminal1,
-                        0,
-                        aux_routeset2)
-                else:
+            chosen_route = list(chosen_route)
+            while (len(chosen_route)
+                    >
+                    self.initial_population_generator.minimum_length
+                ):
+                terminal1_id = chosen_route[0]
+                terminal2_id = chosen_route[-1]
+                if (access_points_occurences[terminal1_id] == 1
+                    and
+                    access_points_occurences[terminal2_id] == 1):
                     break
-                if len(chosen_route) < length_before:
-                    deleted_access_points += 1
-                
-                terminal2 = chosen_route[-1]
-                length_before = len(chosen_route)
-                if len(chosen_route) > self.initial_population_generator.minimum_length:
-                    chosen_route, route_cannot_be_modified_anymore = self.delete_access_point(
-                        chosen_route,
-                        terminal2,
-                        -1,
-                        aux_routeset2)
-                else:
+                terminal_id = choice([terminal1_id, terminal2_id])
+                if access_points_occurences[terminal_id] > 1:
+                    length_before = len(chosen_route)
+                    chosen_route.remove(terminal_id)
+                    access_points_occurences[terminal_id] -= 1
+                    if len(chosen_route) < length_before:
+                        deleted_access_points += 1
+                if deleted_access_points == access_points_to_be_changed:
                     break
-                if len(chosen_route) < length_before:
-                    deleted_access_points += 1
-            previous_route = chosen_route
-            previous_route_index = chosen_route_index
+            chosen_route = tuple(chosen_route)
             modified_routeset.append(chosen_route)
         modified_routeset = set(modified_routeset)
         return modified_routeset
 
     #TODO: NEED TO FIND AND FIX BUGS
+    # FIXED DELETE ACCESS POINTS
     def mutation(
         self,
         individual,

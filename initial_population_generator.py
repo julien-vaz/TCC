@@ -82,7 +82,7 @@ def repair(
                     unused_access_points,
                     touched_access_points,
                     )
-                unused_access_points = all_access_points - touched_access_points
+                unused_access_points = set(all_access_points) - touched_access_points
                 
                 chosen_route, touched_access_points = add_unused_access_points(
                     chosen_route,
@@ -91,7 +91,7 @@ def repair(
                     unused_access_points,
                     touched_access_points
                     )
-                unused_access_points = all_access_points - touched_access_points
+                unused_access_points = set(all_access_points) - touched_access_points
         repaired_routeset.append(chosen_route)
     repaired_routeset = set(repaired_routeset)
     if len(touched_access_points) == network_size:
