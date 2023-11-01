@@ -607,8 +607,8 @@ plt.show()
 
 
 print("BEFORE SEAMO2 IMPROVEMENT\n")
-"""
-for routeset_index, routeset in seamo2.initial_population_generator.population:
+
+"""for routeset_index, routeset in seamo2.initial_population_generator.population.items():
     print(f'Routeset {routeset_index}:\n')
     nodes = parser.get_access_points_id(seamo2.transport_network.graph)
     colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple']
@@ -638,9 +638,9 @@ for routeset_index, routeset in seamo2.initial_population_generator.population:
 #    plt.show()                
     print()
 
-    print("Passenger cost: {:.2f}\n".format(passenger_cost[routeset_index][2]))
-    print("Operator cost: {:.2f}\n".format(operator_cost[routeset_index][2]))
-"""    
+    print("Passenger cost: {:.2f}\n".format(passenger_cost[routeset_index]))
+    print("Operator cost: {:.2f}\n".format(operator_cost[routeset_index]))"""
+    
 print(f"Best routeset for passenger cost: Routeset {best_routeset_so_far_passenger_cost[0]}\n")
 print(f"Best routeset for operator cost: Routeset {best_routeset_so_far_operator_cost[0]}\n")
 
@@ -666,26 +666,17 @@ for _ in range(generations):
     plt.ylabel("Operator cost")
     plt.show()
 
-
     aux_population = list(seamo2.initial_population_generator.population.keys())
-    #TODO: For each individual in the population
-    while :
-        parent1_index = aux_population[0]
+    index = 0
+    for _ in range(len(seamo2.initial_population_generator.population)):
+        parent1_index = aux_population[index]
         parent1 = seamo2.initial_population_generator.population[parent1_index]
         aux_population.remove(parent1_index)
         parent2_index = choice(aux_population)
         parent2 = seamo2.initial_population_generator.population[parent2_index]
         aux_population.append(parent1_index)
+        index += 1
         if parent1 != parent2:
-            if (
-                (parent1_index, parent2_index) not in mated_individuals
-                or
-                (parent2_index, parent1_index) not in mated_individuals
-                ):
-                mated_individuals.add((parent1_index, parent2_index))
-                mated_individuals.add((parent2_index, parent1_index))
-            else:
-                continue
             offspring = seamo2.crossover(parent1, parent2)
             all_access_points = parser.get_access_points_id(seamo2.transport_network.graph)
             # get used access points on routeset
@@ -862,6 +853,7 @@ for _ in range(generations):
                         operator_cost[routeset_index] = offspring_operator_cost
             else:
                 continue
+
 
 print("AFTER SEAMO2 IMPROVEMENT\n")
 """
