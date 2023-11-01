@@ -25,6 +25,28 @@ class AccessPoint:
             neighborhood.append(neighbor.destination)
         return neighborhood
 
+class CoordsParser:
+    def __init__(self, coords_file):
+        self.coords = self.read(coords_file)
+
+    def read(self, coords_file):
+        coords_file = open(coords_file, 'r')
+        parsed_coords = {}
+
+        line_index = 0
+        for line in coords_file:
+            line = line.split()
+            if len(line) == 1:
+                continue
+            coord = []
+            for value in line:
+                value = float(value)
+                coord.append(value)
+            coord = tuple(coord)
+            parsed_coords[line_index] = coord
+            line_index += 1
+        return parsed_coords
+
 
 class DemandMatrixParser:
     def __init__(self, demand_matrix):

@@ -8,8 +8,10 @@ import matplotlib.pyplot as plt
 
 class SEAMO2:
     def __init__(self):
-        self.transport_network = parser.TransportNetwork("MandlTravelTimes.txt")
-        self.demand_matrix = parser.DemandMatrixParser("MandlDemand.txt")
+        self.file_name = "Mandl"
+        self.transport_network = parser.TransportNetwork(self.file_name + "TravelTimes.txt")
+        self.coords = parser.CoordsParser(self.file_name + "Coords.txt")
+        self.demand_matrix = parser.DemandMatrixParser(self.file_name + "Demand.txt")
         self.initial_population_generator = ipg.InitialPopulationGenerator(self.transport_network)
 
     def get_transfer_points(self, routeset):
@@ -578,25 +580,10 @@ seamo2 = SEAMO2()
 adjacencies_list = seamo2.transport_network.build_adjacencies_list()
 
 graph = nx.Graph(adjacencies_list)
-pos = {
-    0:(1, 9),
-    1:(3, 8),
-    2:(4.5, 7.75),
-    3:(2.75, 6.2),
-    4:(0.8, 6.6),
-    5:(4.6, 6),
-    6:(7, 4.5),
-    7:(5.5, 5),
-    8:(8.5, 6.8),
-    9:(5.8, 3.25),
-    10:(3.8, 2.25),
-    11:(1.3, 3.5),
-    12:(5.25, 1),
-    13:(6.7, 1.75),
-    14:(6.75, 5.8)
-}
-nx.draw_networkx(graph, pos, with_labels=True)
-plt.show()
+
+nx.draw_networkx(graph, seamo2.coords.coords, with_labels=True)
+#plt.show()
+plt.savefig(seamo2.file_name + ".pdf")
 
 (
     passenger_cost,
@@ -644,12 +631,16 @@ print("BEFORE SEAMO2 IMPROVEMENT\n")
 print(f"Best routeset for passenger cost: Routeset {best_routeset_so_far_passenger_cost[0]}\n")
 print(f"Best routeset for operator cost: Routeset {best_routeset_so_far_operator_cost[0]}\n")
 
-population_before = deepcopy(seamo2.initial_population_generator.population)
+last_generation = deepcopy(seamo2.initial_population_generator.population)
 generations = int(input("How many generations do you want? "))
-for _ in range(generations):
+figure = 2
+plt.figure(figure)
+for generation_number in range(generations):
 
     print(f"Best passenger cost: {best_routeset_so_far_passenger_cost[2]}")
     print(f"Best operator cost: {best_routeset_so_far_operator_cost[2]}")
+    population_has_changed = (last_generation != seamo2.initial_population_generator.population)    
+    print(f"Population has changed? {population_has_changed} It has {len(seamo2.initial_population_generator.population)} individuals\n")
 
     population_data = []
     passenger_cost_values = []
@@ -660,11 +651,14 @@ for _ in range(generations):
         passenger_cost_values.append(routeset_passenger_cost_value)
         operator_cost_values.append(routeset_operator_cost_value)
         population_data.append((routeset_passenger_cost_value, routeset_operator_cost_value))
-    plt.scatter(passenger_cost_values, operator_cost_values)
-    #plt.plot(passenger_cost_values, operator_cost_values)
-    plt.xlabel("Passenger cost")
-    plt.ylabel("Operator cost")
-    plt.show()
+    
+    if generation_number % 10 == 0:
+        plt.scatter(passenger_cost_values, operator_cost_values)
+        #plt.plot(passenger_cost_values, operator_cost_values)
+        plt.xlabel("Passenger cost")
+        plt.ylabel("Operator cost")
+        plt.savefig(seamo2.file_name + "_" + str(generation_number) + ".pdf")
+
 
     aux_population = list(seamo2.initial_population_generator.population.keys())
     index = 0
@@ -674,7 +668,7 @@ for _ in range(generations):
         aux_population.remove(parent1_index)
         parent2_index = choice(aux_population)
         parent2 = seamo2.initial_population_generator.population[parent2_index]
-        aux_population.append(parent1_index)
+        aux_population.insert(index, parent1_index)
         index += 1
         if parent1 != parent2:
             offspring = seamo2.crossover(parent1, parent2)
@@ -853,7 +847,7 @@ for _ in range(generations):
                         operator_cost[routeset_index] = offspring_operator_cost
             else:
                 continue
-
+    last_generation = deepcopy(seamo2.initial_population_generator.population)
 
 print("AFTER SEAMO2 IMPROVEMENT\n")
 """
