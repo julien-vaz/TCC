@@ -1143,10 +1143,17 @@ figure = seamo2.plot_routeset(
 # Generates a txt file with the final population
 pareto_frontier = []
 for routeset_index in seamo2.initial_population_generator.population:
-    pareto_frontier.append(f"{passenger_cost[routeset_index]:.4f} {operator_cost[routeset_index]}")
+    line = (passenger_cost[routeset_index], operator_cost[routeset_index])
+    if line not in pareto_frontier:
+        pareto_frontier.append(line)
+pareto_frontier.sort()
+pareto_frontier_str = []
+for passenger_cost_value, operator_cost_value in pareto_frontier:
+    line = f"{passenger_cost_value:.4f} {operator_cost_value}"
+    pareto_frontier_str.append(line)
 file_name = f"{seamo2.file_name}_Pareto.txt"
 with open(file_name, 'w') as f:
-    f.write('\n'.join(pareto_frontier))
+    f.write('\n'.join(pareto_frontier_str))
 
 # Generates a txt file with the best routeset for passenger cost
 best_passenger_cost = []
