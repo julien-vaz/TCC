@@ -13,13 +13,24 @@ import numpy as np
 # Class to run the SEAMO2
 class SEAMO2:
     def __init__(self, instance):
-        instances = ["Mandl", "Mumford1", "Mumford2", "Mumford3"]
+        instances = ["Mandl", "Mumford0", "Mumford1", "Mumford2", "Mumford3"]
         print(f"Available benchmarking instances to use: {instances}")
-        self.file_name = input("Choose one:")
+        self.file_name = input("Type one of them exactly as it's written: ")
         self.transport_network = parser.TransportNetwork(self.file_name + "TravelTimes.txt")
         self.coords = parser.CoordsParser(self.file_name + "Coords.txt")
         self.demand_matrix = parser.DemandMatrixParser(self.file_name + "Demand.txt")
         self.initial_population_generator = ipg.InitialPopulationGenerator(self.transport_network)
+
+    # Method to check routeset's connectivity
+    def check_connectivity(self, routeset):
+        routeset_is_connected = True
+        for i in range(len(self.transport_network.graph)):
+            for j in range(len(self.transport_network.graph)):
+                shortest_path_travel_time = self.get_shortest_path_travel_time(routeset, i, j)
+                if shortest_path_travel_time == 0:
+                    routeset_is_connected = False
+        
+        return routeset_is_connected
 
     # Method to get the routeset's transfer points
     def get_transfer_points(self, routeset):
@@ -643,7 +654,8 @@ class SEAMO2:
 
                 '''Gets both terminals' indexes,
                 checks if they appear in more than one route,
-                chooses one of them and deletes it from the chosen route'''
+                chooses one of them, deletes it from the chosen route
+                and checks if the routeset remains connected'''
                 terminal1_id = chosen_route[0]
                 terminal2_id = chosen_route[-1]
                 if (access_points_occurences[terminal1_id] == 1
@@ -651,14 +663,64 @@ class SEAMO2:
                     access_points_occurences[terminal2_id] == 1):
                     break
                 terminal_id = choice([terminal1_id, terminal2_id])
+                if "terminal_id_before" in locals():
+                    while (terminal_id == terminal_id_before):
+                        terminal_id = choice([terminal1_id, terminal2_id])
+                terminal_id_before = terminal_id
                 if access_points_occurences[terminal_id] > 1:
                     length_before = len(chosen_route)
+                    terminal_id_in_route = chosen_route.index(terminal_id)
                     chosen_route.remove(terminal_id)
-                    access_points_occurences[terminal_id] -= 1
+                    routeset_is_connected = self.check_connectivity(routeset)
 
-                    # Checks if the terminal was successfully deleted
-                    if len(chosen_route) < length_before:
-                        deleted_access_points += 1
+                    '''This is needed to avoid a infinite loop
+                    caused by trying the terminals over and over again'''
+                    terminal_id_attempted = terminal_id
+                    if not routeset_is_connected:
+                        if "terminals_attempted" not in locals():
+                            terminals_attempted = set()
+                            terminals_attempted.add(terminal_id_attempted)
+                            if terminal_id_in_route == 0:
+                                chosen_route.insert(terminal_id_in_route, terminal_id)
+                                continue
+                            elif terminal_id_in_route == len(chosen_route):
+                                chosen_route.append(terminal_id)
+                                continue
+                        else:
+                            terminals_attempted.add(terminal_id_attempted)
+                            if terminal_id_in_route == 0:
+                                chosen_route.insert(terminal_id_in_route, terminal_id)
+                            elif terminal_id_in_route == len(chosen_route):
+                                chosen_route.append(terminal_id)
+                            if len(terminals_attempted) == 2:
+                                del terminals_attempted
+                                break
+                            else:
+                                continue
+                    else:
+                        access_points_occurences[terminal_id] -= 1   
+
+                        # Checks if the terminal was successfully deleted
+                        if len(chosen_route) < length_before:
+                            deleted_access_points += 1
+
+                # If the terminal appears only in one route, tries the other
+                if access_points_occurences[terminal_id] == 1:
+
+                    '''This is needed to avoid a infinite loop
+                    caused by trying the terminals over and over again'''
+                    terminal_id_attempted = terminal_id
+                    if "terminals_attempted" not in locals():
+                        terminals_attempted = set()
+                        terminals_attempted.add(terminal_id_attempted)
+                        continue
+                    else:
+                        terminals_attempted.add(terminal_id_attempted)
+                        if len(terminals_attempted) == 2:
+                            del terminals_attempted
+                            break
+                        else:
+                            continue
 
                 # Terminates if the number of access points to be deleted was reached
                 if deleted_access_points == access_points_to_be_changed:
@@ -791,7 +853,7 @@ class SEAMO2:
 
         return passenger_cost, operator_cost, best_routeset_so_far_passenger_cost, best_routeset_so_far_operator_cost
 
-    def plot_routeset(self, routeset, figure, graph, objective):
+    def plot_routeset(self, routeset, figure, graph, objective, edge_labels):
         for route_index, route in enumerate(routeset):
             route_nodes = []
             route_nodes_positions = {}
@@ -799,13 +861,17 @@ class SEAMO2:
                 route_nodes.append(access_point_id)
                 route_nodes_positions[access_point_id] = self.coords.coords[access_point_id]
             route_edges = list(zip(route_nodes, route_nodes[1:]))
+            route_edges_labels = {}
+            for route_edge in route_edges:
+                route_edges_labels[route_edge] = edge_labels[route_edge]
             plt.figure(figure)
             nx.draw_networkx(graph, seamo2.coords.coords, with_labels=True, node_color="#B3B3B3")
             color_map = plt.colormaps.get_cmap("hsv")
             random_color = color_map(random())
             color = np.array(random_color).reshape(1,-1)
             nx.draw_networkx_nodes(graph, route_nodes_positions, route_nodes, node_color=color)
-            nx.draw_networkx_edges(graph, route_nodes_positions, route_edges, edge_color=color, width=3)        
+            nx.draw_networkx_edges(graph, route_nodes_positions, route_edges, edge_color=color, width=3)
+            nx.draw_networkx_edge_labels(graph, seamo2.coords.coords, edge_labels=route_edges_labels, rotate=False)       
             figure += 1
             plt.savefig(self.file_name + "_best_" + objective + "_cost_route_" + str(route_index) + ".pdf")
             
@@ -818,8 +884,10 @@ seamo2 = SEAMO2("Mandl")
 creates the transport network with the coordinates
 for the access points and saves it in a pdf file with matplotlib'''
 adjacencies_list = seamo2.transport_network.build_adjacencies_list()
+edge_labels = seamo2.transport_network.get_edges_travel_time()
 graph = nx.Graph(adjacencies_list)
 nx.draw_networkx(graph, seamo2.coords.coords, with_labels=True, node_color="#B3B3B3")
+nx.draw_networkx_edge_labels(graph, seamo2.coords.coords, edge_labels=edge_labels, rotate=False)
 plt.savefig(seamo2.file_name + ".pdf")
 
 '''Calculates the passenger costs, the operator costs and
@@ -840,7 +908,6 @@ for generation_number in range(generations):
     print(f"Generation number {generation_number}\n")
 
     # Calculations needed to plot the population with matplotlib
-    print("Calculations for plot started\n")
     population_data = []
     passenger_cost_values = []
     operator_cost_values = []
@@ -879,9 +946,7 @@ for generation_number in range(generations):
         if parent1 != parent2:
 
             # Calls the crossover of the two parents and generates the offspring
-            print("Crossover started\n")
             offspring = seamo2.crossover(parent1, parent2)
-            print("Crossover finished\n")
 
             if offspring == False:
                 continue
@@ -895,7 +960,6 @@ for generation_number in range(generations):
 
             # If there're unused access points, tries to repair the offspring
             if len(touched_access_points) < len(seamo2.transport_network.graph):
-                print("Offspring repair started\n") 
                 offspring = ipg.repair(
                     offspring,
                     all_access_points,
@@ -906,7 +970,6 @@ for generation_number in range(generations):
                     seamo2.initial_population_generator.minimum_length,
                     seamo2.transport_network
                     )
-                print("Offspring repair finished\n")
                 if offspring == False:
                     continue
 
@@ -915,13 +978,12 @@ for generation_number in range(generations):
                 touched_access_points = touched_access_points.union(set(route))
 
             # Applies mutation to the offspring
-            print("Offspring mutation started\n")
             offspring = seamo2.mutation(
                 offspring,
                 touched_access_points,
                 all_access_points
                 )
-            print("Offspring mutation finished\n")
+
             # Deletes the offspring if its a duplicate
             offspring_is_duplicate = False
             for routeset in seamo2.initial_population_generator.population.values():
@@ -1066,12 +1128,42 @@ figure = seamo2.plot_routeset(
     best_routeset_so_far_passenger_cost[1],
     figure,
     graph,
-    "passenger"
+    "passenger",
+    edge_labels
     )
 
 figure = seamo2.plot_routeset(
     best_routeset_so_far_operator_cost[1],
     figure,
     graph,
-    "operator"
+    "operator",
+    edge_labels
     )
+
+# Generates a txt file with the final population
+pareto_frontier = []
+for routeset_index in seamo2.initial_population_generator.population:
+    pareto_frontier.append(f"{passenger_cost[routeset_index]:.4f} {operator_cost[routeset_index]}")
+file_name = f"{seamo2.file_name}_Pareto.txt"
+with open(file_name, 'w') as f:
+    f.write('\n'.join(pareto_frontier))
+
+# Generates a txt file with the best routeset for passenger cost
+best_passenger_cost = []
+for route_index, route in enumerate(best_routeset_so_far_passenger_cost[1]):
+    line = f"Route {route_index} : {route}"
+    best_passenger_cost.append(line)
+file_name = f"{seamo2.file_name}_Best_Passenger_Cost.txt"
+with open(file_name, 'w') as f:
+    f.write(f"Best {seamo2.file_name} routeset for passenger cost\n")
+    f.write('\n'.join(best_passenger_cost))
+
+# Generates a txt file with the best routeset for operator cost
+best_operator_cost = []
+for route_index, route in enumerate(best_routeset_so_far_operator_cost[1]):
+    line = f"Route {route_index} : {route}"
+    best_operator_cost.append(line)
+file_name = f"{seamo2.file_name}_Best_Operator_Cost.txt"
+with open(file_name, 'w') as f:
+    f.write(f"Best {seamo2.file_name} routeset for operator cost\n")
+    f.write('\n'.join(best_operator_cost))

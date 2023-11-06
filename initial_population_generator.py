@@ -132,7 +132,6 @@ class InitialPopulationGenerator:
             )
 
     def generate_initial_population(self, population_size, transport_network):
-        print("Initial population is being generated...")
         # Population is a dictionary in order to use the routesets' indexes as keys
         population = {}
         routeset_index = 0
@@ -141,12 +140,10 @@ class InitialPopulationGenerator:
             if routeset not in population.values() and routeset != False:
                 population[routeset_index] = routeset
                 routeset_index += 1
-        print("Initial population has been successfully generated.")
 
         return population
         
     def generate_routeset(self, transport_network):
-        print("Generating routeset...")
         network_size = len(transport_network.graph)
 
         # Routeset is created as an array to be easier to manipulate the structure
@@ -160,7 +157,6 @@ class InitialPopulationGenerator:
         count = 0
         while count < self.routeset_size:
             desired_length = randint(self.minimum_length, self.maximum_length)
-            print(f"Desired length: {desired_length}")
 
             # If it's the first route of the routeset
             if count == 0:
@@ -226,7 +222,6 @@ class InitialPopulationGenerator:
 
             # If the desired length is not reached
             if route_length != desired_length:
-                print(f"Desired length was not achieved. Trying to grow route {count} again.")
 
                 # Tries again from the route's initial access point
                 regrow_route = True
@@ -236,7 +231,6 @@ class InitialPopulationGenerator:
                 # Resets the set of used access points to before the route was grown
                 touched_access_points = touched_access_points_before
             else:
-                print(f"Route {count} has been successfully generated.")
                 regrow_route = False
                 count += 1
 
@@ -247,17 +241,13 @@ class InitialPopulationGenerator:
             # And the routes from array to tuple
             route = tuple(route)
             routeset.add(route)
-        print("Routeset has been generated")
-        print()
 
         # Checks if there weren't duplicated routes
         if len(routeset) != self.routeset_size:
-            print("Routeset is infeasible. It will be discarded from the population.")
             return False
 
         # Checks if the routeset is connected
         if len(touched_access_points) < network_size:
-            print("Starting repair of routeset...")
             repaired_routeset = repair(
                 routeset,
                 all_access_points_ids,
@@ -269,11 +259,9 @@ class InitialPopulationGenerator:
                 self.transport_network
                 )
             if repaired_routeset:
-                print("Routeset has been successfully repaired. Adding it to the population...")
 
                 return repaired_routeset
             else:
-                print("Routeset is infeasible. It will be discarded from the population.")
                 
                 return False
             

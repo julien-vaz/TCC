@@ -135,4 +135,15 @@ class TransportNetwork:
                 adjacencies_list[access_point.id] = access_point_adjacencies
 
         return adjacencies_list
-    
+
+    # Method to get the edges' travel time
+    def get_edges_travel_time(self):
+        edges_travel_time = {}
+        for access_point in self.graph:
+            for link in access_point.links:
+                if ((access_point.id, link.destination.id) not in edges_travel_time
+                    or
+                    (link.destination.id, access_point.id) not in edges_travel_time):
+                    edges_travel_time[(access_point.id, link.destination.id)] = link.travel_time
+        
+        return edges_travel_time
