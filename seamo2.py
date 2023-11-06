@@ -467,7 +467,7 @@ class SEAMO2:
                 between the seed and the potential route'''
                 if not seed.isdisjoint(set(route)):
                     potential_routes.append(route)
-
+            
             # Calculates the next route to be added to the offspring from the potential routes
             next_route = []
             smallest_intersection = len(self.transport_network.graph)
@@ -482,18 +482,34 @@ class SEAMO2:
                     smallest_intersection = len(intersection)
                     next_route = route
             
+            '''This is needed to avoid a infinite loop
+            by a lack of potential routes absent from the offspring'''
+            parent_attempted = tuple(chosen_parent)
+            if len(next_route) == 0:
+                if "parents_attempted" not in locals():
+                    parents_attempted = set()
+                    parents_attempted.add(parent_attempted)
+                else:
+                    parents_attempted.add(parent_attempted)
+                    if len(parents_attempted) == 2:
+                        break
+                first_parent = not first_parent
+                continue
+            
+
             '''Updates the seed, adding the chosen route's access points
             to it and alternates the chosen parent'''
-            if len(next_route) != 0 and next_route in chosen_parent:
-                chosen_parent.remove(next_route)
-            else:
-                first_parent = not first_parent
-                continue  
+            chosen_parent.remove(next_route)
             offspring.append(next_route)
             seed = seed.union(set(next_route))
+            parents_attempted = set()
             first_parent = not first_parent
         
         offspring = set(offspring)
+
+        # If the offspring was not successfully generated, deletes it
+        if len(offspring) != len(parent1):
+            return False
 
         return offspring
 
@@ -784,9 +800,10 @@ class SEAMO2:
                 route_nodes_positions[access_point_id] = self.coords.coords[access_point_id]
             route_edges = list(zip(route_nodes, route_nodes[1:]))
             plt.figure(figure)
-            nx.draw_networkx(graph, seamo2.coords.coords, with_labels=True)
+            nx.draw_networkx(graph, seamo2.coords.coords, with_labels=True, node_color="#B3B3B3")
             color_map = plt.colormaps.get_cmap("hsv")
-            color = color_map(random())
+            random_color = color_map(random())
+            color = np.array(random_color).reshape(1,-1)
             nx.draw_networkx_nodes(graph, route_nodes_positions, route_nodes, node_color=color)
             nx.draw_networkx_edges(graph, route_nodes_positions, route_edges, edge_color=color, width=3)        
             figure += 1
@@ -802,7 +819,7 @@ creates the transport network with the coordinates
 for the access points and saves it in a pdf file with matplotlib'''
 adjacencies_list = seamo2.transport_network.build_adjacencies_list()
 graph = nx.Graph(adjacencies_list)
-nx.draw_networkx(graph, seamo2.coords.coords, with_labels=True)
+nx.draw_networkx(graph, seamo2.coords.coords, with_labels=True, node_color="#B3B3B3")
 plt.savefig(seamo2.file_name + ".pdf")
 
 '''Calculates the passenger costs, the operator costs and
@@ -820,8 +837,10 @@ plt.figure(figure)
 
 # Repeats until the number of generations is reached
 for generation_number in range(generations):
+    print(f"Generation number {generation_number}\n")
 
     # Calculations needed to plot the population with matplotlib
+    print("Calculations for plot started\n")
     population_data = []
     passenger_cost_values = []
     operator_cost_values = []
@@ -834,7 +853,10 @@ for generation_number in range(generations):
     
     # Plots only the generations multiple of 10
     if generation_number % 10 == 0:
-        plt.scatter(passenger_cost_values, operator_cost_values)
+        color_map = plt.colormaps.get_cmap("hsv")
+        random_color = color_map(random())
+        color = np.array(random_color).reshape(1,-1)
+        plt.scatter(passenger_cost_values, operator_cost_values, c=color)
         plt.xlabel("Passenger cost")
         plt.ylabel("Operator cost")
         plt.savefig(seamo2.file_name + "_" + str(generation_number) + ".pdf")
@@ -857,7 +879,12 @@ for generation_number in range(generations):
         if parent1 != parent2:
 
             # Calls the crossover of the two parents and generates the offspring
+            print("Crossover started\n")
             offspring = seamo2.crossover(parent1, parent2)
+            print("Crossover finished\n")
+
+            if offspring == False:
+                continue
 
             all_access_points = parser.get_access_points_id(seamo2.transport_network.graph)
 
@@ -867,7 +894,8 @@ for generation_number in range(generations):
                 touched_access_points = touched_access_points.union(set(route))
 
             # If there're unused access points, tries to repair the offspring
-            if len(touched_access_points) < len(seamo2.transport_network.graph): 
+            if len(touched_access_points) < len(seamo2.transport_network.graph):
+                print("Offspring repair started\n") 
                 offspring = ipg.repair(
                     offspring,
                     all_access_points,
@@ -878,6 +906,7 @@ for generation_number in range(generations):
                     seamo2.initial_population_generator.minimum_length,
                     seamo2.transport_network
                     )
+                print("Offspring repair finished\n")
                 if offspring == False:
                     continue
 
@@ -886,12 +915,13 @@ for generation_number in range(generations):
                 touched_access_points = touched_access_points.union(set(route))
 
             # Applies mutation to the offspring
+            print("Offspring mutation started\n")
             offspring = seamo2.mutation(
                 offspring,
                 touched_access_points,
                 all_access_points
                 )
-            
+            print("Offspring mutation finished\n")
             # Deletes the offspring if its a duplicate
             offspring_is_duplicate = False
             for routeset in seamo2.initial_population_generator.population.values():
