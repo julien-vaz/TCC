@@ -584,6 +584,10 @@ class SEAMO2:
                 '''Tests one of the terminals, chooses one access point
                 from the possible ones and insert it in the route '''
                 chosen_terminal = choice([terminal1_id, terminal2_id])
+                if "chosen_terminal_before" in locals():
+                    while (chosen_terminal == chosen_terminal_before):
+                        chosen_terminal = choice([terminal1_id, terminal2_id])
+                chosen_terminal_before = chosen_terminal
                 if chosen_terminal == terminal1_id:
                     if len(candidates_for_addition_terminal1) > 0:
                         chosen_access_point = choice(
@@ -591,13 +595,43 @@ class SEAMO2:
                             )
                         chosen_route.insert(0, chosen_access_point)
                     else:
-                        chosen_terminal = terminal2_id
+
+                        '''This is needed to avoid a infinite loop
+                        caused by trying the terminals over and over again'''
+                        terminal_id_attempted = chosen_terminal
+                        if "terminals_attempted" not in locals():
+                            terminals_attempted = set()
+                            terminals_attempted.add(terminal_id_attempted)
+                            continue
+                        else:
+                            terminals_attempted.add(terminal_id_attempted)
+                            if len(terminals_attempted) == 2:
+                                del terminals_attempted
+                                break
+                            else:
+                                continue
                 if chosen_terminal == terminal2_id:
                     if len(candidates_for_addition_terminal2) > 0:
                         chosen_access_point = choice(
                             candidates_for_addition_terminal2
                             )
                         chosen_route.append(chosen_access_point)
+                    else:
+
+                        '''This is needed to avoid a infinite loop
+                        caused by trying the terminals over and over again'''
+                        terminal_id_attempted = chosen_terminal
+                        if "terminals_attempted" not in locals():
+                            terminals_attempted = set()
+                            terminals_attempted.add(terminal_id_attempted)
+                            continue
+                        else:
+                            terminals_attempted.add(terminal_id_attempted)
+                            if len(terminals_attempted) == 2:
+                                del terminals_attempted
+                                break
+                            else:
+                                continue
 
                 # Checks if the access point was successfully added
                 if len(chosen_route) > length_before:
@@ -607,6 +641,20 @@ class SEAMO2:
                 if added_access_points == access_points_to_be_changed:
                     break
 
+            # Resets the terminals attempted set
+            if "terminals_attempted" in locals():
+                del terminals_attempted
+
+            # Checks if route is already in the routeset
+            if ((tuple(chosen_route) in modified_routeset)
+                or
+                (tuple(chosen_route) in aux_routeset)):
+                chosen_route.remove(chosen_access_point)
+                added_access_points -= 1
+            if tuple(chosen_route) in aux_routeset:
+                chosen_route.remove(chosen_terminal)
+                added_access_points -= 1
+
             chosen_route = tuple(chosen_route)
             modified_routeset.append(chosen_route)
         
@@ -615,6 +663,9 @@ class SEAMO2:
             for route in aux_routeset:
                 modified_routeset.append(route)
         modified_routeset = set(modified_routeset)
+
+        if len(modified_routeset) < len(routeset):
+            return False
 
         return modified_routeset
 
@@ -951,6 +1002,7 @@ for generation_number in range(generations):
             if offspring == False:
                 continue
 
+
             all_access_points = parser.get_access_points_id(seamo2.transport_network.graph)
 
             # Gets the used access points in the offspring
@@ -983,6 +1035,8 @@ for generation_number in range(generations):
                 touched_access_points,
                 all_access_points
                 )
+            if not offspring:
+                continue
 
             # Deletes the offspring if its a duplicate
             offspring_is_duplicate = False
