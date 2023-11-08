@@ -9,6 +9,7 @@ from copy import deepcopy
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
+import time
 
 # Class to run the SEAMO2
 class SEAMO2:
@@ -16,6 +17,7 @@ class SEAMO2:
         instances = ["Mandl", "Mumford0", "Mumford1", "Mumford2", "Mumford3"]
         print(f"Available benchmarking instances to use: {instances}")
         self.file_name = input("Type one of them exactly as it's written: ")
+        self.start_time = time.time()
         self.transport_network = parser.TransportNetwork(self.file_name + "TravelTimes.txt")
         self.coords = parser.CoordsParser(self.file_name + "Coords.txt")
         self.demand_matrix = parser.DemandMatrixParser(self.file_name + "Demand.txt")
@@ -287,7 +289,7 @@ class SEAMO2:
                                 third_path = third_route[
                                     chosen_transfer_point_from_origin_index_third_route
                                     :
-                                    chosen_transfer_point_to_destination_index_third_route
+                                    chosen_transfer_point_to_destination_index_third_route + 1
                                     ]
                             elif (
                                 chosen_transfer_point_from_origin_index_third_route
@@ -297,7 +299,7 @@ class SEAMO2:
                                 third_path = third_route[
                                     chosen_transfer_point_to_destination_index_third_route
                                     :
-                                    chosen_transfer_point_from_origin_index_third_route
+                                    chosen_transfer_point_from_origin_index_third_route + 1
                                 ]
                                 third_path = list(third_path)
                                 third_path.reverse()
@@ -306,8 +308,8 @@ class SEAMO2:
                             '''Concatenates all three parts,
                             computes the path travel time and
                             compares it with the shortest one already calculated'''
-                            path = first_path + third_path[1:] + second_path[1:]
-                            path_travel_time = self.compute_path_travel_time(path)
+                            path = first_path + third_path[1:] + second_path[1:] 
+                            path_travel_time = self.compute_path_travel_time(path) + (2 * 5)
                             if path_travel_time < shortest_path_travel_time:
                                 shortest_path_travel_time = path_travel_time
 
@@ -1175,6 +1177,9 @@ for generation_number in range(generations):
             else:
                 continue
 
+end_time = time.time()
+elapsed_time = f"Elapsed time: {end_time - seamo2.start_time}s"
+
 # Generates images of the best routeset for each objective with NetworkX and saves them in pdf files
 nodes = parser.get_access_points_id(seamo2.transport_network.graph)
 figure = 3 
@@ -1207,6 +1212,8 @@ for passenger_cost_value, operator_cost_value in pareto_frontier:
     pareto_frontier_str.append(line)
 file_name = f"{seamo2.file_name}_Pareto.txt"
 with open(file_name, 'w') as f:
+    f.write(elapsed_time)
+    f.write('\n')
     f.write('\n'.join(pareto_frontier_str))
 
 # Generates a txt file with the best routeset for passenger cost
