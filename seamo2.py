@@ -14,24 +14,132 @@ import time
 # Class to run the SEAMO2
 class SEAMO2:
     def __init__(self, instance):
-        instances = ["Mandl", "Mumford0", "Mumford1", "Mumford2", "Mumford3"]
-        print(f"Available benchmarking instances to use: {instances}")
-        self.file_name = input("Type one of them exactly as it's written: ")
+        self.file_name = "Mandl"
         self.start_time = time.time()
         self.transport_network = parser.TransportNetwork(self.file_name + "TravelTimes.txt")
         self.coords = parser.CoordsParser(self.file_name + "Coords.txt")
         self.demand_matrix = parser.DemandMatrixParser(self.file_name + "Demand.txt")
         self.initial_population_generator = ipg.InitialPopulationGenerator(self.transport_network)
 
+    # Auxiliary method for checking the connectivity of a routeset
+    def find_paths_with_transfer(
+        self,
+        routeset,
+        origin_id,
+        routes_with_origin,
+        destination_id,
+        routes_with_destination,
+        transfers
+        ):
+        # If all routes are connected, the number of transfers needed is the same of the routes
+        if transfers >= self.initial_population_generator.routeset_size:
+            transfers = 1
+            return False
+
+        # Gets the transfer points related to the origin and to the destination
+        routeset_transfer_points = self.get_transfer_points(routeset)
+        transfer_points_from_origin = set()
+        transfer_points_to_destination = set()
+        for transfer_point in routeset_transfer_points:
+
+            for first_route in routes_with_origin:
+                if transfer_point in first_route:
+                    transfer_points_from_origin.add(transfer_point)
+            
+            for second_route in routes_with_destination:
+                if transfer_point in second_route:
+                    transfer_points_to_destination.add(transfer_point)
+
+        # Checks if there's a direct path from origin to destination in any route
+        transfer_points_from_origin_to_destination = transfer_points_from_origin.intersection(transfer_points_to_destination)
+        if len(transfer_points_from_origin_to_destination) != 0:
+            transfers = 1
+            return True
+        else:
+            transfers += 1
+
+        # If all routes are connected, the number of transfers needed is the same of the routes
+        if transfers >= 6:
+            transfers = 1
+            return False
+        
+        # Checks if there's a path with one transfer
+        for route in routeset:
+            transfer_points_from_origin_in_route = set(route).intersection(transfer_points_from_origin)
+            transfer_points_to_destination_in_route = set(route).intersection(transfer_points_to_destination)
+
+            if len(transfer_points_from_origin_in_route) != 0 and len(transfer_points_to_destination_in_route) != 0:
+                transfers = 1
+                return True
+        
+        # Gets the routes containing the transfer points related to the origin and to the destination
+        transfers += 1
+        for transfer_point_from_origin in transfer_points_from_origin:
+            for transfer_point_to_destination in transfer_points_to_destination:
+
+                routes_with_transfer_point_from_origin = set()
+                routes_with_transfer_point_to_destination = set()
+                for route in routeset:
+                    if transfer_point_from_origin in route:
+                        routes_with_transfer_point_from_origin.add(route)
+                    if transfer_point_to_destination in route:
+                        routes_with_transfer_point_to_destination.add(route)
+
+                # Checks if there's a path with more than one transfer
+                paths_with_transfers = self.find_paths_with_transfer(
+                    routeset,
+                    transfer_point_from_origin,
+                    routes_with_transfer_point_from_origin,
+                    transfer_point_to_destination,
+                    routes_with_transfer_point_to_destination,
+                    transfers
+                )
+                if not paths_with_transfers:
+                    transfers = 1
+                    return False
+
+    # Auxiliary method for checking the connectivity of a routeset    
+    def find_path(self, routeset, origin_id, destination_id):
+        routes_with_origin = set()
+        routes_with_destination = set()
+        
+        for route in routeset:
+            if origin_id in route:
+                routes_with_origin.add(route)
+            if destination_id in route:
+                routes_with_destination.add(route)
+        
+        direct_paths = routes_with_origin.intersection(routes_with_destination)
+        if len(direct_paths) != 0:
+            return True
+
+        transfers = 1
+        paths_with_transfers = self.find_paths_with_transfer(
+            routeset,
+            origin_id,
+            routes_with_origin,
+            destination_id,
+            routes_with_destination,
+            transfers
+            )
+
+        return paths_with_transfers
+
+
     # Method to check routeset's connectivity
     def check_connectivity(self, routeset):
-        routeset_is_connected = True
+        routeset_is_connected = False
         for i in range(len(self.transport_network.graph)):
             for j in range(len(self.transport_network.graph)):
-                shortest_path_travel_time = self.get_shortest_path_travel_time(routeset, i, j)
-                if shortest_path_travel_time == 0:
+                if i == j:
+                    continue
+                path_found = self.find_path(routeset, i, j)
+                if path_found:
+                    routeset_is_connected = True
+                else:
                     routeset_is_connected = False
-        
+                    return routeset_is_connected
+
         return routeset_is_connected
 
     # Method to get the routeset's transfer points
@@ -155,13 +263,14 @@ class SEAMO2:
                     '''Concatenates both slices,
                     calculates the path travel time and
                     compares it with the shortest one already calculated''' 
+                    path_found = True
                     path = path + second_path[1:]
                     path_travel_time = self.compute_path_travel_time(path) + 5
                     if path_travel_time < shortest_path_travel_time:
                         shortest_path_travel_time = path_travel_time
 
                 # Resets the routes containing the destination for tests with other transfer point        
-                routes_with_destination_aux = routes_with_destination
+                routes_with_destination_aux = deepcopy(routes_with_destination)
 
             # Does the same steps above but if the path is in reverse sense                            
             elif origin_id_index > chosen_transfer_point_index:
@@ -183,8 +292,8 @@ class SEAMO2:
                     path_travel_time = self.compute_path_travel_time(path) + 5
                     if path_travel_time < shortest_path_travel_time:
                         shortest_path_travel_time = path_travel_time
-                routes_with_destination_aux = routes_with_destination
-            
+                routes_with_destination_aux = deepcopy(routes_with_destination)
+
         return shortest_path_travel_time
 
     # Method to get the path's travel time with two transfers
@@ -788,7 +897,11 @@ class SEAMO2:
                 modified_routeset.append(route)
         modified_routeset = set(modified_routeset)
 
-        return modified_routeset
+        modified_routeset_is_connected = self.check_connectivity(modified_routeset)
+        if modified_routeset_is_connected:
+            return modified_routeset
+        else:
+            return False
 
     # Method to add to or delete access points from the routeset as the mutation
     def mutation(
@@ -1004,7 +1117,6 @@ for generation_number in range(generations):
             if offspring == False:
                 continue
 
-
             all_access_points = parser.get_access_points_id(seamo2.transport_network.graph)
 
             # Gets the used access points in the offspring
@@ -1037,7 +1149,7 @@ for generation_number in range(generations):
                 touched_access_points,
                 all_access_points
                 )
-            if not offspring:
+            if not offspring or len(offspring) != seamo2.initial_population_generator.routeset_size:
                 continue
 
             # Deletes the offspring if its a duplicate

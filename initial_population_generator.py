@@ -4,6 +4,7 @@ import parser
 from random import randint, choice
 from copy import deepcopy
 
+
 # Function to add unused access points during the repair mechanism
 def add_unused_access_points(
     chosen_route,
